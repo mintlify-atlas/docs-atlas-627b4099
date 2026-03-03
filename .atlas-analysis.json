@@ -1,0 +1,146 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Zustand",
+  "projectDescription": "A small, fast, and scalable state management solution for React with hooks-first ergonomics.",
+  "theme": "palm",
+  "primaryColor": "#654321",
+  "lightColor": "#8B6F47",
+  "darkColor": "#3D2817",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart",
+              "comparison"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core/creating-stores",
+              "core/reading-state",
+              "core/updating-state",
+              "core/async-actions",
+              "core/vanilla-stores"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/typescript",
+              "guides/nextjs",
+              "guides/testing",
+              "guides/immutable-state-and-merging",
+              "guides/slices-pattern",
+              "guides/flux-inspired-practice",
+              "guides/ssr-and-hydration",
+              "guides/practice-with-no-store-actions",
+              "guides/initialize-state-with-props",
+              "guides/how-to-reset-state",
+              "guides/prevent-rerenders-with-use-shallow",
+              "guides/auto-generating-selectors",
+              "guides/maps-and-sets-usage",
+              "guides/connect-to-state-with-url-hash",
+              "guides/event-handler-in-pre-react-18"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/tic-tac-toe"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core APIs",
+            "pages": [
+              "api/create",
+              "api/create-store",
+              "api/create-with-equality-fn"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/use-store",
+              "api/use-store-with-equality-fn",
+              "api/use-shallow"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/shallow"
+            ]
+          },
+          {
+            "group": "Middleware",
+            "pages": [
+              "middleware/persist",
+              "middleware/immer",
+              "middleware/devtools",
+              "middleware/redux",
+              "middleware/subscribe-with-selector",
+              "middleware/combine"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/immer-middleware",
+              "integrations/persisting-store-data",
+              "integrations/third-party-libraries"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Migrations",
+        "groups": [
+          {
+            "group": "Version Migrations",
+            "pages": [
+              "migrations/migrating-to-v5",
+              "migrations/migrating-to-v4"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Minimal API with hooks-first ergonomics",
+    "No context providers needed",
+    "Handles React concurrency and zombie child problems",
+    "Works in vanilla JavaScript and React",
+    "TypeScript-first with strong type inference",
+    "Tiny bundle size (~1KB)",
+    "Middleware support (persist, devtools, immer, redux)",
+    "Selective re-rendering with selectors"
+  ],
+  "publicApiSurface": [
+    "create",
+    "createStore",
+    "createWithEqualityFn",
+    "useStore",
+    "useStoreWithEqualityFn",
+    "useShallow",
+    "shallow",
+    "persist",
+    "immer",
+    "devtools",
+    "redux",
+    "subscribeWithSelector",
+    "combine"
+  ]
+}
