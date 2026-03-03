@@ -1,0 +1,131 @@
+---
+title: Immer Middleware
+description: Use immutable state updates in a more convenient way with Immer middleware
+---
+
+The [Immer](https://github.com/immerjs/immer) middleware enables you to use immutable state in a more convenient way. With Immer, you can simplify handling immutable data structures in Zustand by writing mutable-looking code that safely updates state.
+
+## Installation
+
+In order to use the Immer middleware in Zustand, you will need to install Immer as a direct dependency.
+
+```bash
+npm install immer
+```
+
+## Usage
+
+<Note>
+Notice the extra parentheses after the type parameter as mentioned in the [TypeScript Guide](/guides/typescript).
+</Note>
+
+### Updating Simple States
+
+For simple state updates, Immer allows you to directly mutate the state object:
+
+```ts
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+
+type State = {
+  count: number
+}
+
+type Actions = {
+  increment: (qty: number) => void
+  decrement: (qty: number) => void
+}
+
+export const useCountStore = create<State & Actions>()()
+  immer((set) => ({
+    count: 0,
+    increment: (qty: number) =>
+      set((state) => {
+        state.count += qty
+      }),
+    decrement: (qty: number) =>
+      set((state) => {
+        state.count -= qty
+      }),
+  })),
+)
+```
+
+### Updating Complex States
+
+Immer really shines when working with deeply nested or complex state structures:
+
+```ts
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+
+interface Todo {
+  id: string
+  title: string
+  done: boolean
+}
+
+type State = {
+  todos: Record<string, Todo>
+}
+
+type Actions = {
+  toggleTodo: (todoId: string) => void
+}
+
+export const useTodoStore = create<State & Actions>()()
+  immer((set) => ({
+    todos: {
+      '82471c5f-4207-4b1d-abcb-b98547e01a3e': {
+        id: '82471c5f-4207-4b1d-abcb-b98547e01a3e',
+        title: 'Learn Zustand',
+        done: false,
+      },
+      '354ee16c-bfdd-44d3-afa9-e93679bda367': {
+        id: '354ee16c-bfdd-44d3-afa9-e93679bda367',
+        title: 'Learn Jotai',
+        done: false,
+      },
+      '771c85c5-46ea-4a11-8fed-36cc2c7be344': {
+        id: '771c85c5-46ea-4a11-8fed-36cc2c7be344',
+        title: 'Learn Valtio',
+        done: false,
+      },
+      '363a4bac-083f-47f7-a0a2-aeeee153a99c': {
+        id: '363a4bac-083f-47f7-a0a2-aeeee153a99c',
+        title: 'Learn Signals',
+        done: false,
+      },
+    },
+    toggleTodo: (todoId: string) =>
+      set((state) => {
+        state.todos[todoId].done = !state.todos[todoId].done
+      }),
+  })),
+)
+```
+
+## Gotchas
+
+In this section you will find some things that you need to keep in mind when using Zustand with Immer.
+
+### My subscriptions aren't being called
+
+If you are using Immer, make sure you are actually following [the rules of Immer](https://immerjs.github.io/immer/pitfalls).
+
+<Warning>
+For [class objects](https://immerjs.github.io/immer/complex-objects) to work properly with Immer, you must add `[immerable] = true` to the class.
+</Warning>
+
+If you don't do this, Immer will still mutate the object, but not as a proxy, so it will also update the current state. Zustand checks if the state has actually changed, so since both the current state and the next state are equal (if you don't do it correctly), Zustand will skip calling the subscriptions.
+
+## Live Demos
+
+<CardGroup cols={2}>
+  <Card title="Basic Example" icon="code" href="https://stackblitz.com/edit/vitejs-vite-3sgc4ejy">
+    Simple counter example using Immer middleware
+  </Card>
+  <Card title="Advanced Example" icon="rocket" href="https://stackblitz.com/edit/vitejs-vite-jxxtuyj3">
+    Complex todo list with nested state updates
+  </Card>
+</CardGroup>

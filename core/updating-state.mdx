@@ -1,0 +1,509 @@
+---
+title: Updating State
+description: Learn how to update state immutably in Zustand stores
+---
+
+Updating state in Zustand is done through the `set` function. Understanding how to update state properly is crucial for maintaining predictable application behavior.
+
+## The set Function
+
+The `set` function is provided to your state creator and is used to update the store's state:
+
+```typescript
+type SetStateInternal<T> = {
+  (
+    partial: T | Partial<T> | ((state: T) => T | Partial<T>),
+    replace?: false,
+  ): void
+  (state: T | ((state: T) => T), replace: true): void
+}
+```
+
+## Partial Updates (Shallow Merge)
+
+By default, `set` performs a **shallow merge** of the new state with the existing state:
+
+```typescript
+import { create } from 'zustand'
+
+type State = {
+  firstName: string
+  lastName: string
+  age: number
+}
+
+const usePersonStore = create<State>()((set) => ({
+  firstName: 'John',
+  lastName: 'Doe',
+  age: 30,
+}))
+
+// Only updates firstName, keeping lastName and age unchanged
+usePersonStore.setState({ firstName: 'Jane' })
+```
+
+<Info>
+Shallow merge means that `set` merges properties at the top level only. Nested objects must be merged manually.
+</Info>
+
+## Function Updates
+
+When the new state depends on the previous state, use a function:
+
+<CodeGroup>
+```typescript Simple Increment
+type CounterStore = {
+  count: number
+  increment: () => void
+}
+
+const useCounterStore = create<CounterStore>()((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+}))
+```
+
+```typescript Complex Update
+type TodoStore = {
+  todos: Array<{ id: number; text: string; done: boolean }>
+  toggleTodo: (id: number) => void
+}
+
+const useTodoStore = create<TodoStore>()((set) => ({
+  todos: [],
+  toggleTodo: (id) =>
+    set((state) => ({
+      todos: state.todos.map((todo) =>
+        todo.id === id ? { ...todo, done: !todo.done } : todo
+      ),
+    })),
+}))
+```
+</CodeGroup>
+
+<Warning>
+Always use function updates when the new state depends on the previous state. This ensures you're working with the latest state, especially important in async scenarios.
+</Warning>
+
+## Replace Mode
+
+Use the second parameter of `set` to completely replace the state instead of merging:
+
+<Tabs>
+  <Tab title="Object State">
+    ```typescript
+    const useStore = create<{ a: number } | { b: number }>()(() => ({ a: 1 }))
+
+    // Merge mode (default)
+    useStore.setState({ b: 2 }) // Result: { a: 1, b: 2 }
+
+    // Replace mode
+    useStore.setState({ b: 2 }, true) // Result: { b: 2 }
+    ```
+
+    <Warning>
+    Replace mode discards all existing state. Use with caution to avoid losing nested data.
+    </Warning>
+  </Tab>
+
+  <Tab title="Primitive State">
+    ```typescript
+    const useCountStore = create<number>()(() => 0)
+
+    // Always use replace mode for primitives
+    useCountStore.setState(1, true)
+    useCountStore.setState((count) => count + 1, true)
+    ```
+
+    <Note>
+    When your state is a primitive value (number, string, boolean), you must use `replace: true`.
+    </Note>
+  </Tab>
+
+  <Tab title="Array State">
+    ```typescript
+    type PositionStore = [number, number]
+
+    const usePositionStore = create<PositionStore>()(() => [0, 0])
+
+    // Always use replace mode for arrays as the root state
+    usePositionStore.setState([10, 20], true)
+    ```
+  </Tab>
+</Tabs>
+
+## Immutable Update Patterns
+
+Zustand requires immutable updates. Never mutate state directly.
+
+### Updating Primitives
+
+<Steps>
+  <Step title="Numbers, Strings, Booleans">
+    Simply assign the new value:
+
+    ```typescript
+    type State = {
+      count: number
+      name: string
+      active: boolean
+    }
+
+    const useStore = create<State>()((set) => ({
+      count: 0,
+      name: '',
+      active: false,
+    }))
+
+    // Direct assignment works for primitives
+    useStore.setState({ count: 1 })
+    useStore.setState({ name: 'Alice' })
+    useStore.setState({ active: true })
+    ```
+  </Step>
+</Steps>
+
+### Updating Objects
+
+<CodeGroup>
+```typescript Shallow Object
+type State = {
+  user: { name: string; age: number }
+  updateUser: (updates: Partial<State['user']>) => void
+}
+
+const useStore = create<State>()((set) => ({
+  user: { name: 'John', age: 30 },
+  updateUser: (updates) =>
+    set((state) => ({
+      user: { ...state.user, ...updates },
+    })),
+}))
+
+// Usage
+useStore.getState().updateUser({ age: 31 })
+```
+
+```typescript Nested Object
+type State = {
+  user: {
+    profile: {
+      name: string
+      email: string
+    }
+    settings: {
+      theme: 'light' | 'dark'
+    }
+  }
+  updateProfile: (updates: Partial<State['user']['profile']>) => void
+}
+
+const useStore = create<State>()((set) => ({
+  user: {
+    profile: { name: 'John', email: 'john@example.com' },
+    settings: { theme: 'light' },
+  },
+  updateProfile: (updates) =>
+    set((state) => ({
+      user: {
+        ...state.user,
+        profile: {
+          ...state.user.profile,
+          ...updates,
+        },
+      },
+    })),
+}))
+```
+</CodeGroup>
+
+<Warning>
+This is wrong - it mutates state:
+
+```typescript
+// ❌ BAD: Direct mutation
+set((state) => {
+  state.user.name = 'Jane'
+  return state
+})
+
+// ✅ GOOD: Immutable update
+set((state) => ({
+  user: { ...state.user, name: 'Jane' },
+}))
+```
+</Warning>
+
+### Updating Arrays
+
+<Tabs>
+  <Tab title="Adding Items">
+    ```typescript
+    type TodoStore = {
+      todos: string[]
+      addTodo: (todo: string) => void
+    }
+
+    const useStore = create<TodoStore>()((set) => ({
+      todos: [],
+      addTodo: (todo) =>
+        set((state) => ({ todos: [...state.todos, todo] })),
+    }))
+    ```
+
+    <Tip>
+    Use the spread operator `[...array, newItem]` or `concat()` to add items.
+    </Tip>
+  </Tab>
+
+  <Tab title="Removing Items">
+    ```typescript
+    type TodoStore = {
+      todos: Array<{ id: number; text: string }>
+      removeTodo: (id: number) => void
+    }
+
+    const useStore = create<TodoStore>()((set) => ({
+      todos: [],
+      removeTodo: (id) =>
+        set((state) => ({
+          todos: state.todos.filter((todo) => todo.id !== id),
+        })),
+    }))
+    ```
+
+    <Tip>
+    Use `filter()` to remove items.
+    </Tip>
+  </Tab>
+
+  <Tab title="Updating Items">
+    ```typescript
+    type TodoStore = {
+      todos: Array<{ id: number; text: string; done: boolean }>
+      toggleTodo: (id: number) => void
+      updateTodoText: (id: number, text: string) => void
+    }
+
+    const useStore = create<TodoStore>()((set) => ({
+      todos: [],
+      toggleTodo: (id) =>
+        set((state) => ({
+          todos: state.todos.map((todo) =>
+            todo.id === id ? { ...todo, done: !todo.done } : todo
+          ),
+        })),
+      updateTodoText: (id, text) =>
+        set((state) => ({
+          todos: state.todos.map((todo) =>
+            todo.id === id ? { ...todo, text } : todo
+          ),
+        })),
+    }))
+    ```
+
+    <Tip>
+    Use `map()` to update items.
+    </Tip>
+  </Tab>
+
+  <Tab title="Sorting & Reversing">
+    ```typescript
+    type ItemStore = {
+      items: number[]
+      sortItems: () => void
+      reverseItems: () => void
+    }
+
+    const useStore = create<ItemStore>()((set) => ({
+      items: [3, 1, 2],
+      sortItems: () =>
+        set((state) => ({ items: [...state.items].sort() })),
+      reverseItems: () =>
+        set((state) => ({ items: [...state.items].reverse() })),
+    }))
+    ```
+
+    <Warning>
+    Methods like `sort()` and `reverse()` mutate the array. Always create a copy first with the spread operator.
+    </Warning>
+  </Tab>
+</Tabs>
+
+### Immutable Operations Reference
+
+<AccordionGroup>
+  <Accordion title="Recommended Immutable Operations">
+    - **Arrays**: `[...array]`, `concat()`, `filter()`, `slice()`, `map()`, `toSpliced()`, `toSorted()`, `toReversed()`
+    - **Objects**: `{ ...object }`, `Object.assign({}, object)`
+  </Accordion>
+
+  <Accordion title="Mutable Operations to Avoid">
+    - **Arrays**: Direct assignment `array[i] = x`, `push()`, `unshift()`, `pop()`, `shift()`, `splice()`, `reverse()`, `sort()`
+    - **Objects**: Direct property assignment `object.prop = x`
+  </Accordion>
+</AccordionGroup>
+
+## Deep State Updates
+
+For complex nested state, consider using a library:
+
+<Tabs>
+  <Tab title="Manual Spread">
+    ```typescript
+    type State = {
+      deep: {
+        nested: {
+          obj: { count: number }
+        }
+      }
+    }
+
+    const useStore = create<State>()((set) => ({
+      deep: { nested: { obj: { count: 0 } } },
+    }))
+
+    // Manual deep update
+    useStore.setState((state) => ({
+      deep: {
+        ...state.deep,
+        nested: {
+          ...state.deep.nested,
+          obj: {
+            ...state.deep.nested.obj,
+            count: state.deep.nested.obj.count + 1,
+          },
+        },
+      },
+    }))
+    ```
+  </Tab>
+
+  <Tab title="With Immer">
+    ```typescript
+    import { create } from 'zustand'
+    import { immer } from 'zustand/middleware/immer'
+
+    type State = {
+      deep: {
+        nested: {
+          obj: { count: number }
+        }
+      }
+      increment: () => void
+    }
+
+    const useStore = create<State>()(immer((set) => ({
+      deep: { nested: { obj: { count: 0 } } },
+      increment: () =>
+        set((state) => {
+          state.deep.nested.obj.count++
+        }),
+    })))
+    ```
+
+    <Info>
+    Immer allows you to write "mutating" code that produces immutable updates. See the [Immer middleware documentation](/middleware/immer) for details.
+    </Info>
+  </Tab>
+</Tabs>
+
+## Updating State Outside Actions
+
+You can define actions outside the store:
+
+```typescript
+const useStore = create<{ count: number }>()(() => ({ count: 0 }))
+
+// External action
+const increment = () => {
+  useStore.setState((state) => ({ count: state.count + 1 }))
+}
+
+// Use in components
+function Counter() {
+  const count = useStore((state) => state.count)
+  return <button onClick={increment}>{count}</button>
+}
+```
+
+<Note>
+While this pattern works, it's generally recommended to colocate actions with state inside the store for better organization.
+</Note>
+
+## Batching Updates
+
+Zustand automatically batches state updates in React event handlers:
+
+```tsx
+import { create } from 'zustand'
+
+const useStore = create<{ count: number }>()(() => ({ count: 0 }))
+
+function Component() {
+  const handleClick = () => {
+    // These are automatically batched
+    useStore.setState((s) => ({ count: s.count + 1 }))
+    useStore.setState((s) => ({ count: s.count + 1 }))
+    // Component only re-renders once with count: 2
+  }
+
+  return <button onClick={handleClick}>Increment</button>
+}
+```
+
+## Common Pitfalls
+
+<Warning>
+**Direct Mutation**
+
+```typescript
+// ❌ BAD: Mutates state
+set((state) => {
+  state.count++
+  return state
+})
+
+// ✅ GOOD: Returns new state
+set((state) => ({ count: state.count + 1 }))
+```
+</Warning>
+
+<Warning>
+**Forgetting to Return**
+
+```typescript
+// ❌ BAD: Arrow function without return
+const increment = () => set((state) => { count: state.count + 1 })
+
+// ✅ GOOD: With explicit return or implicit return
+const increment = () => set((state) => ({ count: state.count + 1 }))
+```
+</Warning>
+
+<Warning>
+**Using set Instead of setState**
+
+```typescript
+// Inside the store creator
+(set) => ({
+  increment: () => set((s) => ({ count: s.count + 1 })), // ✅ Correct
+})
+
+// Outside the store
+const increment = () => {
+  useStore.setState((s) => ({ count: s.count + 1 })) // ✅ Correct
+}
+```
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Async Actions" icon="clock" href="/core/async-actions">
+    Handle asynchronous operations in your store
+  </Card>
+  <Card title="Vanilla Stores" icon="cube" href="/core/vanilla-stores">
+    Use Zustand without React
+  </Card>
+</CardGroup>

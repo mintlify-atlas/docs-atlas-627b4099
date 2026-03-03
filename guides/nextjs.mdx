@@ -1,0 +1,341 @@
+---
+title: Next.js Integration
+description: How to properly use Zustand with Next.js for server-side rendering
+---
+
+<Note>
+  We will be updating this guide soon based on our discussion in [GitHub #2740](https://github.com/pmndrs/zustand/discussions/2740).
+</Note>
+
+[Next.js](https://nextjs.org) is a popular server-side rendering framework for React that presents some unique challenges for using Zustand properly.
+
+## Challenges with Next.js
+
+Keep in mind that Zustand store is a global variable (module state), which makes it optional to use Context. These challenges include:
+
+<CardGroup cols={2}>
+  <Card title="Per-request Store" icon="server">
+    A Next.js server can handle multiple requests simultaneously. The store should be created per request and not shared across requests.
+  </Card>
+  <Card title="SSR Friendly" icon="repeat">
+    Next.js applications render twice—on the server and client. Different outputs cause hydration errors.
+  </Card>
+  <Card title="SPA Routing" icon="route">
+    Next.js supports hybrid client-side routing. To reset a store, initialize it at the component level using Context.
+  </Card>
+  <Card title="Server Caching" icon="database">
+    Recent Next.js versions (App Router) support aggressive server caching. Zustand's module state is compatible with this.
+  </Card>
+</CardGroup>
+
+## Recommendations
+
+<Warning>
+Follow these guidelines for proper Zustand usage in Next.js:
+
+- **No global stores** - Don't define stores as global variables. Create stores per request.
+- **React Server Components should not read from or write to the store** - RSCs can't use hooks or context and shouldn't interact with global stores.
+</Warning>
+
+## Creating a Store Per Request
+
+<Steps>
+  <Step title="Configure TypeScript">
+    Set up your `tsconfig.json` for Next.js:
+
+    ```json tsconfig.json
+    {
+      "compilerOptions": {
+        "lib": ["dom", "dom.iterable", "esnext"],
+        "allowJs": true,
+        "skipLibCheck": true,
+        "strict": true,
+        "noEmit": true,
+        "esModuleInterop": true,
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "jsx": "preserve",
+        "incremental": true,
+        "plugins": [
+          {
+            "name": "next"
+          }
+        ],
+        "paths": {
+          "@/*": ["./src/*"]
+        }
+      },
+      "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+      "exclude": ["node_modules"]
+    }
+    ```
+
+    <Note>Remove all comments from your `tsconfig.json` file.</Note>
+  </Step>
+
+  <Step title="Initialize the Store">
+    Create a store factory function using `zustand/vanilla`:
+
+    ```ts src/stores/counter-store.ts
+    import { createStore } from 'zustand/vanilla'
+
+    export type CounterState = {
+      count: number
+    }
+
+    export type CounterActions = {
+      decrementCount: () => void
+      incrementCount: () => void
+    }
+
+    export type CounterStore = CounterState & CounterActions
+
+    export const defaultInitState: CounterState = {
+      count: 0,
+    }
+
+    export const createCounterStore = (
+      initState: CounterState = defaultInitState,
+    ) => {
+      return createStore<CounterStore>()((set) => ({
+        ...initState,
+        decrementCount: () => set((state) => ({ count: state.count - 1 })),
+        incrementCount: () => set((state) => ({ count: state.count + 1 })),
+      }))
+    }
+    ```
+  </Step>
+
+  <Step title="Create a Context Provider">
+    Share the store using a context provider:
+
+    ```tsx src/providers/counter-store-provider.tsx
+    'use client'
+
+    import { type ReactNode, createContext, useState, useContext } from 'react'
+    import { useStore } from 'zustand'
+
+    import { type CounterStore, createCounterStore } from '@/stores/counter-store'
+
+    export type CounterStoreApi = ReturnType<typeof createCounterStore>
+
+    export const CounterStoreContext = createContext<CounterStoreApi | undefined>(
+      undefined,
+    )
+
+    export interface CounterStoreProviderProps {
+      children: ReactNode
+    }
+
+    export const CounterStoreProvider = ({
+      children,
+    }: CounterStoreProviderProps) => {
+      const [store] = useState(() => createCounterStore())
+      return (
+        <CounterStoreContext.Provider value={store}>
+          {children}
+        </CounterStoreContext.Provider>
+      )
+    }
+
+    export const useCounterStore = <T,>(
+      selector: (store: CounterStore) => T,
+    ): T => {
+      const counterStoreContext = useContext(CounterStoreContext)
+      if (!counterStoreContext) {
+        throw new Error(`useCounterStore must be used within CounterStoreProvider`)
+      }
+
+      return useStore(counterStoreContext, selector)
+    }
+    ```
+
+    <Info>
+      This component is re-render-safe by checking the reference value, ensuring the store is only created once per request.
+    </Info>
+  </Step>
+</Steps>
+
+## Usage with Different Architectures
+
+Next.js offers two architectures: Pages Router and App Router. Usage is similar with slight differences.
+
+<Tabs>
+  <Tab title="Pages Router">
+    <Steps>
+      <Step title="Create a Page Component">
+        ```tsx src/components/pages/home-page.tsx
+        import { useCounterStore } from '@/providers/counter-store-provider'
+
+        export const HomePage = () => {
+          const { count, incrementCount, decrementCount } = useCounterStore(
+            (state) => state,
+          )
+
+          return (
+            <div>
+              Count: {count}
+              <hr />
+              <button type="button" onClick={incrementCount}>
+                Increment Count
+              </button>
+              <button type="button" onClick={decrementCount}>
+                Decrement Count
+              </button>
+            </div>
+          )
+        }
+        ```
+      </Step>
+
+      <Step title="Wrap in _app.tsx">
+        ```tsx src/_app.tsx
+        import type { AppProps } from 'next/app'
+
+        import { CounterStoreProvider } from '@/providers/counter-store-provider'
+
+        export default function App({ Component, pageProps }: AppProps) {
+          return (
+            <CounterStoreProvider>
+              <Component {...pageProps} />
+            </CounterStoreProvider>
+          )
+        }
+        ```
+      </Step>
+
+      <Step title="Use in Page">
+        ```tsx src/pages/index.tsx
+        import { HomePage } from '@/components/pages/home-page'
+
+        export default function Home() {
+          return <HomePage />
+        }
+        ```
+      </Step>
+    </Steps>
+
+    <Accordion title="Per-route Store (Optional)">
+      For a store per route, create and share the store at the page component level:
+
+      ```tsx src/pages/index.tsx
+      import { CounterStoreProvider } from '@/providers/counter-store-provider'
+      import { HomePage } from '@/components/pages/home-page'
+
+      export default function Home() {
+        return (
+          <CounterStoreProvider>
+            <HomePage />
+          </CounterStoreProvider>
+        )
+      }
+      ```
+
+      <Warning>Only use this pattern if you need a separate store per route.</Warning>
+    </Accordion>
+  </Tab>
+
+  <Tab title="App Router">
+    <Steps>
+      <Step title="Create a Client Component">
+        ```tsx src/components/pages/home-page.tsx
+        'use client'
+
+        import { useCounterStore } from '@/providers/counter-store-provider'
+
+        export const HomePage = () => {
+          const { count, incrementCount, decrementCount } = useCounterStore(
+            (state) => state,
+          )
+
+          return (
+            <div>
+              Count: {count}
+              <hr />
+              <button type="button" onClick={incrementCount}>
+                Increment Count
+              </button>
+              <button type="button" onClick={decrementCount}>
+                Decrement Count
+              </button>
+            </div>
+          )
+        }
+        ```
+      </Step>
+
+      <Step title="Wrap in Root Layout">
+        ```tsx src/app/layout.tsx
+        import type { Metadata } from 'next'
+        import { Inter } from 'next/font/google'
+        import './globals.css'
+
+        import { CounterStoreProvider } from '@/providers/counter-store-provider'
+
+        const inter = Inter({ subsets: ['latin'] })
+
+        export const metadata: Metadata = {
+          title: 'Create Next App',
+          description: 'Generated by create next app',
+        }
+
+        export default function RootLayout({
+          children,
+        }: Readonly<{
+          children: React.ReactNode
+        }>) {
+          return (
+            <html lang="en">
+              <body className={inter.className}>
+                <CounterStoreProvider>{children}</CounterStoreProvider>
+              </body>
+            </html>
+          )
+        }
+        ```
+      </Step>
+
+      <Step title="Use in Page">
+        ```tsx src/app/page.tsx
+        import { HomePage } from '@/components/pages/home-page'
+
+        export default function Home() {
+          return <HomePage />
+        }
+        ```
+      </Step>
+    </Steps>
+
+    <Accordion title="Per-route Store (Optional)">
+      For a store per route, create and share the store at the page level:
+
+      ```tsx src/app/page.tsx
+      import { CounterStoreProvider } from '@/providers/counter-store-provider'
+      import { HomePage } from '@/components/pages/home-page'
+
+      export default function Home() {
+        return (
+          <CounterStoreProvider>
+            <HomePage />
+          </CounterStoreProvider>
+        )
+      }
+      ```
+
+      <Warning>Only use this pattern if you need a separate store per route.</Warning>
+    </Accordion>
+  </Tab>
+</Tabs>
+
+## Related Guides
+
+<CardGroup cols={2}>
+  <Card title="SSR and Hydration" icon="water" href="/guides/ssr-and-hydration">
+    Learn about server-side rendering and hydration concepts
+  </Card>
+  <Card title="TypeScript" icon="code" href="/guides/typescript">
+    Type-safe patterns for Zustand stores
+  </Card>
+</CardGroup>

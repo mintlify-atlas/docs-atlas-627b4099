@@ -1,0 +1,352 @@
+---
+title: Reading State
+description: Learn how to read state from Zustand stores in React components
+---
+
+Zustand provides multiple ways to read state from your stores, each optimized for different use cases.
+
+## Using the Hook Without Selectors
+
+The simplest way to read state is to call the hook without any arguments:
+
+```tsx
+import { create } from 'zustand'
+
+type BearStore = {
+  bears: number
+  fish: number
+}
+
+const useBearStore = create<BearStore>()((set) => ({
+  bears: 0,
+  fish: 0,
+}))
+
+function BearCounter() {
+  // Gets the entire state object
+  const state = useBearStore()
+  return <h1>{state.bears} bears and {state.fish} fish</h1>
+}
+```
+
+<Warning>
+Reading the entire state object will cause your component to re-render on **every** state change, even if the component only uses a small part of the state.
+</Warning>
+
+## Using Selectors
+
+Selectors allow you to pick specific pieces of state, causing re-renders only when that specific data changes.
+
+### Basic Selectors
+
+```tsx
+function BearCounter() {
+  // Only re-renders when bears changes
+  const bears = useBearStore((state) => state.bears)
+  return <h1>{bears} bears around here...</h1>
+}
+
+function FishCounter() {
+  // Only re-renders when fish changes
+  const fish = useBearStore((state) => state.fish)
+  return <h1>{fish} fish in the pond</h1>
+}
+```
+
+<Info>
+Selectors use `Object.is` for equality checking by default. The component only re-renders if the selected value changes.
+</Info>
+
+### Selecting Multiple Values
+
+<Tabs>
+  <Tab title="Multiple Hooks">
+    The recommended approach is to use multiple hooks:
+
+    ```tsx
+    function Controls() {
+      const bears = useBearStore((state) => state.bears)
+      const increasePopulation = useBearStore((state) => state.increasePopulation)
+      
+      return (
+        <div>
+          <p>Bears: {bears}</p>
+          <button onClick={increasePopulation}>Add bear</button>
+        </div>
+      )
+    }
+    ```
+
+    <Tip>
+    This pattern is efficient because Zustand's hook is optimized for multiple calls in the same component.
+    </Tip>
+  </Tab>
+
+  <Tab title="Object Selector">
+    You can also select multiple values into an object:
+
+    ```tsx
+    import { useShallow } from 'zustand/react/shallow'
+
+    function Controls() {
+      const { bears, increasePopulation } = useBearStore(
+        useShallow((state) => ({
+          bears: state.bears,
+          increasePopulation: state.increasePopulation,
+        }))
+      )
+      
+      return (
+        <div>
+          <p>Bears: {bears}</p>
+          <button onClick={increasePopulation}>Add bear</button>
+        </div>
+      )
+    }
+    ```
+
+    <Note>
+    When selecting objects, use `useShallow` to perform shallow equality checking and prevent unnecessary re-renders.
+    </Note>
+  </Tab>
+</Tabs>
+
+### Computed Selectors
+
+Selectors can compute derived state:
+
+```tsx
+type TodoStore = {
+  todos: Array<{ id: number; done: boolean; text: string }>
+  addTodo: (text: string) => void
+  toggleTodo: (id: number) => void
+}
+
+const useTodoStore = create<TodoStore>()((set) => ({
+  todos: [],
+  addTodo: (text) =>
+    set((state) => ({
+      todos: [...state.todos, { id: Date.now(), done: false, text }],
+    })),
+  toggleTodo: (id) =>
+    set((state) => ({
+      todos: state.todos.map((todo) =>
+        todo.id === id ? { ...todo, done: !todo.done } : todo
+      ),
+    })),
+}))
+
+function TodoStats() {
+  // Computed value: only re-renders when the count changes
+  const completedCount = useTodoStore((state) =>
+    state.todos.filter((todo) => todo.done).length
+  )
+  
+  const totalCount = useTodoStore((state) => state.todos.length)
+  
+  return (
+    <div>
+      {completedCount} of {totalCount} completed
+    </div>
+  )
+}
+```
+
+## Using getState()
+
+For reading state outside of React components or without subscribing to updates:
+
+```typescript
+const useBearStore = create<BearStore>()((set) => ({
+  bears: 0,
+  increasePopulation: () => set((state) => ({ bears: state.bears + 1 })),
+}))
+
+// Read state without subscribing
+const currentBears = useBearStore.getState().bears
+
+// Call actions outside components
+useBearStore.getState().increasePopulation()
+```
+
+<Warning>
+`getState()` does not subscribe to updates. It's a one-time read of the current state. Use this for actions or event handlers, not for rendering.
+</Warning>
+
+### Common Use Cases for getState()
+
+<CodeGroup>
+```typescript Event Handlers
+const logCurrentState = () => {
+  const { bears, fish } = useBearStore.getState()
+  console.log(`Bears: ${bears}, Fish: ${fish}`)
+}
+
+document.getElementById('log-btn')?.addEventListener('click', logCurrentState)
+```
+
+```typescript External Updates
+const syncWithServer = async () => {
+  const state = useBearStore.getState()
+  await fetch('/api/sync', {
+    method: 'POST',
+    body: JSON.stringify(state),
+  })
+}
+```
+
+```typescript Inside Actions
+const useStore = create<{
+  count: number
+  increment: () => void
+  incrementIfBelow: (max: number) => void
+}>((set, get) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  incrementIfBelow: (max) => {
+    const { count } = get()
+    if (count < max) {
+      set({ count: count + 1 })
+    }
+  },
+}))
+```
+</CodeGroup>
+
+## Selector Performance
+
+### Memoizing Selectors
+
+<Tabs>
+  <Tab title="Static Selectors (Recommended)">
+    Define selectors outside components for best performance:
+
+    ```tsx
+    // Defined once, reused across renders
+    const selectBears = (state: BearStore) => state.bears
+    const selectIncreasePopulation = (state: BearStore) => state.increasePopulation
+
+    function BearCounter() {
+      const bears = useBearStore(selectBears)
+      const increasePopulation = useBearStore(selectIncreasePopulation)
+      
+      return (
+        <div>
+          <h1>{bears} bears</h1>
+          <button onClick={increasePopulation}>Add bear</button>
+        </div>
+      )
+    }
+    ```
+  </Tab>
+
+  <Tab title="Inline Selectors">
+    Inline selectors work fine but are recreated on every render:
+
+    ```tsx
+    function BearCounter() {
+      // New function created on every render (still efficient)
+      const bears = useBearStore((state) => state.bears)
+      return <h1>{bears} bears</h1>
+    }
+    ```
+
+    <Info>
+    Zustand handles inline selectors efficiently, but static selectors are marginally faster.
+    </Info>
+  </Tab>
+</Tabs>
+
+### Avoiding Unnecessary Re-renders
+
+<Steps>
+  <Step title="Select only what you need">
+    ```tsx
+    // Good: only re-renders when count changes
+    const count = useStore((state) => state.count)
+
+    // Bad: re-renders on any state change
+    const state = useStore()
+    const count = state.count
+    ```
+  </Step>
+
+  <Step title="Use primitive selectors when possible">
+    ```tsx
+    // Good: primitive value comparison
+    const userName = useStore((state) => state.user.name)
+
+    // Less optimal: object comparison
+    const user = useStore((state) => state.user)
+    const userName = user.name
+    ```
+  </Step>
+
+  <Step title="Use shallow equality for objects">
+    ```tsx
+    import { useShallow } from 'zustand/react/shallow'
+
+    // Prevents re-render if array contents are the same
+    const todoIds = useStore(
+      useShallow((state) => state.todos.map((t) => t.id))
+    )
+    ```
+  </Step>
+</Steps>
+
+## Reading Vanilla Store State
+
+When using vanilla stores created with `createStore()`, use the `useStore` hook:
+
+```tsx
+import { createStore, useStore } from 'zustand'
+
+const counterStore = createStore<{ count: number }>()((set) => ({
+  count: 0,
+}))
+
+function Counter() {
+  // Use the useStore hook with the vanilla store
+  const count = useStore(counterStore, (state) => state.count)
+  return <div>Count: {count}</div>
+}
+```
+
+<Info>
+See the [Vanilla Stores](/core/vanilla-stores) guide for more details on using vanilla stores in React.
+</Info>
+
+## Subscribing to Changes
+
+You can subscribe to state changes imperatively:
+
+```tsx
+import { useEffect } from 'react'
+
+function Logger() {
+  useEffect(() => {
+    const unsubscribe = useBearStore.subscribe((state, prevState) => {
+      console.log('Bears changed from', prevState.bears, 'to', state.bears)
+    })
+
+    return unsubscribe
+  }, [])
+
+  return null
+}
+```
+
+<Note>
+The `subscribe` function returns an unsubscribe function. Always call it in your cleanup to prevent memory leaks.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Updating State" icon="pen" href="/core/updating-state">
+    Learn how to update state immutably
+  </Card>
+  <Card title="Async Actions" icon="clock" href="/core/async-actions">
+    Handle asynchronous operations in actions
+  </Card>
+</CardGroup>

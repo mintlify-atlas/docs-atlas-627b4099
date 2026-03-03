@@ -1,80 +1,337 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Create your first Zustand store and start managing state in minutes
 ---
 
-## Get started in three steps
+This guide will get you up and running with Zustand in just a few minutes. You'll create a store, use it in components, and see how simple state management can be.
 
-Get your documentation site running locally and make your first customization.
+## Your first store
 
-### Step 1: Set up your local environment
+Creating a store in Zustand is straightforward. Your store is a hook that you can use anywhere in your application.
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Install Zustand">
+    First, install Zustand in your project:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    <CodeGroup>
+    ```bash npm
+    npm install zustand
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    ```bash yarn
+    yarn add zustand
+    ```
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash pnpm
+    pnpm add zustand
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Create a store">
+    Import `create` from zustand and define your store. You can put anything in it: primitives, objects, functions.
+    
+    ```jsx store.js
+    import { create } from 'zustand'
+    
+    const useBearStore = create((set) => ({
+      bears: 0,
+      increasePopulation: () => set((state) => ({ bears: state.bears + 1 })),
+      removeAllBears: () => set({ bears: 0 }),
+    }))
+    ```
+    
+    <Info>
+      The `set` function merges state by default. You can update just the properties you want to change.
+    </Info>
+  </Step>
+  
+  <Step title="Use the store in components">
+    Use the hook anywhere in your app. No providers needed! Components will re-render when the selected state changes.
+    
+    ```jsx BearCounter.jsx
+    function BearCounter() {
+      const bears = useBearStore((state) => state.bears)
+      return <h1>{bears} around here...</h1>
+    }
+    
+    function Controls() {
+      const increasePopulation = useBearStore((state) => state.increasePopulation)
+      return <button onClick={increasePopulation}>one up</button>
+    }
+    ```
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Complete example
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Here's a complete working example you can copy and run:
 
-### Step 3: Go live
+<Tabs>
+  <Tab title="JavaScript">
+    ```jsx App.jsx
+    import { create } from 'zustand'
+    
+    // Create your store
+    const useStore = create((set) => ({
+      count: 1,
+      inc: () => set((state) => ({ count: state.count + 1 })),
+    }))
+    
+    // Use it in your components
+    function Counter() {
+      const { count, inc } = useStore()
+      return (
+        <div>
+          <span>{count}</span>
+          <button onClick={inc}>one up</button>
+        </div>
+      )
+    }
+    
+    export default Counter
+    ```
+  </Tab>
+  
+  <Tab title="TypeScript">
+    ```tsx App.tsx
+    import { create } from 'zustand'
+    
+    // Define your store's type
+    type Store = {
+      count: number
+      inc: () => void
+    }
+    
+    // Create your store with type safety
+    const useStore = create<Store>()((set) => ({
+      count: 1,
+      inc: () => set((state) => ({ count: state.count + 1 })),
+    }))
+    
+    // Use it in your components
+    function Counter() {
+      const { count, inc } = useStore()
+      return (
+        <div>
+          <span>{count}</span>
+          <button onClick={inc}>one up</button>
+        </div>
+      )
+    }
+    
+    export default Counter
+    ```
+    
+    <Tip>
+      Notice the `create<Store>()` syntax with an extra `()`. This is needed for proper TypeScript inference.
+    </Tip>
+  </Tab>
+</Tabs>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Understanding selectors
+
+Selectors are functions that pick specific values from your store. They're crucial for performance:
+
+```jsx
+// ✅ Good: Only re-renders when bears changes
+const bears = useBearStore((state) => state.bears)
+
+// ✅ Good: Only re-renders when increasePopulation changes (never, it's a function)
+const increasePopulation = useBearStore((state) => state.increasePopulation)
+
+// ⚠️ Careful: Re-renders on ANY state change
+const state = useBearStore()
+```
+
+<Warning>
+  Fetching the entire state without a selector will cause your component to re-render on every state change, even if the component only uses a small part of the state.
+</Warning>
+
+## Updating state
+
+There are multiple ways to update state in Zustand:
+
+### Partial updates
+
+The `set` function merges state by default:
+
+```jsx
+const useStore = create((set) => ({
+  firstName: 'John',
+  lastName: 'Doe',
+  updateFirstName: (name) => set({ firstName: name })
+  // lastName remains unchanged
+}))
+```
+
+### Functional updates
+
+When the new state depends on the previous state, use a function:
+
+```jsx
+const useStore = create((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  incrementBy: (amount) => set((state) => ({ count: state.count + amount })),
+}))
+```
+
+### Complete replacement
+
+Pass `true` as the second argument to replace the entire state:
+
+```jsx
+const useStore = create((set) => ({
+  count: 0,
+  reset: () => set({ count: 0 }, true) // Replaces entire state
+}))
+```
+
+<Warning>
+  Be careful with complete replacement - it will remove all state properties, including your action functions!
+</Warning>
+
+## Async actions
+
+Async actions work naturally - just call `set` when you're ready:
+
+```jsx
+const useStore = create((set) => ({
+  fishies: {},
+  fetch: async (pond) => {
+    const response = await fetch(pond)
+    set({ fishies: await response.json() })
+  },
+}))
+```
+
+## Reading state in actions
+
+Use the `get` parameter to read the current state inside actions:
+
+```jsx
+const useStore = create((set, get) => ({
+  sound: 'grunt',
+  action: () => {
+    const sound = get().sound
+    // Use the current sound value
+    console.log(sound)
+  },
+}))
+```
+
+## Multiple state slices
+
+You can select multiple values efficiently:
+
+```jsx
+// Multiple separate selectors (recommended)
+const nuts = useBearStore((state) => state.nuts)
+const honey = useBearStore((state) => state.honey)
+
+// Or use useShallow for object selectors
+import { useShallow } from 'zustand/react/shallow'
+
+const { nuts, honey } = useBearStore(
+  useShallow((state) => ({ nuts: state.nuts, honey: state.honey }))
+)
+```
+
+## Using state outside components
+
+You can read and update state outside React components:
+
+```jsx
+const useDogStore = create(() => ({ paw: true, snout: true, fur: true }))
+
+// Get current state
+const paw = useDogStore.getState().paw
+
+// Update state
+useDogStore.setState({ paw: false })
+
+// Subscribe to changes
+const unsub = useDogStore.subscribe(console.log)
+
+// Unsubscribe
+unsub()
+```
+
+<Tip>
+  This is useful for integrating with non-React code, logging, or creating side effects.
+</Tip>
+
+## Common patterns
+
+### Separate actions from state
+
+Keep your store organized by grouping related logic:
+
+```jsx
+const useStore = create((set, get) => ({
+  // State
+  count: 0,
+  user: null,
+  
+  // Actions
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  decrement: () => set((state) => ({ count: state.count - 1 })),
+  setUser: (user) => set({ user }),
+}))
+```
+
+### Computed values
+
+Create derived state with selectors:
+
+```jsx
+const useStore = create((set) => ({
+  firstName: 'John',
+  lastName: 'Doe',
+}))
+
+// In your component
+const fullName = useStore(
+  (state) => `${state.firstName} ${state.lastName}`
+)
+```
+
+### Resetting state
+
+Store the initial state and reset to it:
+
+```jsx
+const initialState = {
+  bears: 0,
+  fish: 0,
+}
+
+const useStore = create((set) => ({
+  ...initialState,
+  increase: () => set((state) => ({ bears: state.bears + 1 })),
+  reset: () => set(initialState),
+}))
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+You now know the basics of Zustand! Here's where to go next:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Comparison" icon="scale-balanced" href="/comparison">
+    See how Zustand compares to Redux, Jotai, and other state managers
+  </Card>
+  
+  <Card title="TypeScript guide" icon="code" href="/guides/typescript">
+    Learn TypeScript best practices with Zustand
+  </Card>
+  
+  <Card title="Middleware" icon="puzzle-piece" href="/middleware/persist">
+    Add persistence, devtools, and more with middleware
+  </Card>
+  
+  <Card title="API reference" icon="book" href="/api/create">
+    Explore the complete API documentation
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

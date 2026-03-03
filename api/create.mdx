@@ -1,0 +1,202 @@
+---
+title: create
+description: Create a React Hook-based Zustand store
+---
+
+The `create` function creates a React Hook that contains your store's state and actions. It returns a hook with API utilities attached, allowing you to access state in your React components.
+
+## Import
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { create } from 'zustand'
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    import { create } from 'zustand'
+    ```
+  </Tab>
+</Tabs>
+
+## Type Signature
+
+```typescript
+function create<T, Mos extends [StoreMutatorIdentifier, unknown][] = []>(
+  initializer: StateCreator<T, [], Mos>
+): UseBoundStore<Mutate<StoreApi<T>, Mos>>
+
+// Curried version
+function create<T>(): <Mos extends [StoreMutatorIdentifier, unknown][] = []>(
+  initializer: StateCreator<T, [], Mos>
+) => UseBoundStore<Mutate<StoreApi<T>, Mos>>
+```
+
+## Parameters
+
+<ParamField path="initializer" type="StateCreator<T, [], Mos>" required>
+  A function that receives `set`, `get`, and `store` as arguments and returns the initial state object with actions.
+  
+  The function signature is:
+  ```typescript
+  (set: SetState<T>, get: GetState<T>, store: StoreApi<T>) => T
+  ```
+  
+  - `set`: Function to update the state
+  - `get`: Function to get the current state
+  - `store`: The store API object with `setState`, `getState`, `subscribe`, etc.
+</ParamField>
+
+## Returns
+
+<ResponseField name="useBoundStore" type="UseBoundStore<StoreApi<T>>">
+  A React Hook that can be called to access the store state. The hook has the following signature:
+  
+  ```typescript
+  (): T  // Returns the entire state
+  <U>(selector: (state: T) => U): U  // Returns a selected slice of state
+  ```
+  
+  The hook also has the following API utilities attached:
+  
+  - `setState`: Update the state
+  - `getState`: Get the current state outside of React
+  - `getInitialState`: Get the initial state
+  - `subscribe`: Subscribe to state changes
+</ResponseField>
+
+## Basic Usage
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { create } from 'zustand'
+
+    interface BearState {
+      bears: number
+      increase: () => void
+      decrease: () => void
+    }
+
+    const useBearStore = create<BearState>()((set) => ({
+      bears: 0,
+      increase: () => set((state) => ({ bears: state.bears + 1 })),
+      decrease: () => set((state) => ({ bears: state.bears - 1 })),
+    }))
+
+    function BearCounter() {
+      const bears = useBearStore((state) => state.bears)
+      return <h1>{bears} around here...</h1>
+    }
+
+    function Controls() {
+      const increase = useBearStore((state) => state.increase)
+      const decrease = useBearStore((state) => state.decrease)
+      return (
+        <>
+          <button onClick={increase}>Add bear</button>
+          <button onClick={decrease}>Remove bear</button>
+        </>
+      )
+    }
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    import { create } from 'zustand'
+
+    const useBearStore = create((set) => ({
+      bears: 0,
+      increase: () => set((state) => ({ bears: state.bears + 1 })),
+      decrease: () => set((state) => ({ bears: state.bears - 1 })),
+    }))
+
+    function BearCounter() {
+      const bears = useBearStore((state) => state.bears)
+      return <h1>{bears} around here...</h1>
+    }
+
+    function Controls() {
+      const increase = useBearStore((state) => state.increase)
+      const decrease = useBearStore((state) => state.decrease)
+      return (
+        <>
+          <button onClick={increase}>Add bear</button>
+          <button onClick={decrease}>Remove bear</button>
+        </>
+      )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Using the Entire State
+
+You can access the entire state object by calling the hook without a selector:
+
+```typescript
+function BearBox() {
+  const state = useBearStore()
+  return (
+    <div>
+      <p>Bears: {state.bears}</p>
+      <button onClick={state.increase}>+1</button>
+    </div>
+  )
+}
+```
+
+## Accessing State Outside React
+
+Use `getState` to read state outside of React components:
+
+```typescript
+const currentBears = useBearStore.getState().bears
+
+// Call actions outside React
+useBearStore.getState().increase()
+```
+
+## Subscribing to State Changes
+
+Subscribe to state updates outside of React:
+
+```typescript
+const unsubscribe = useBearStore.subscribe(
+  (state, prevState) => {
+    console.log('Bears changed from', prevState.bears, 'to', state.bears)
+  }
+)
+
+// Later: unsubscribe()
+```
+
+## Updating State
+
+The `set` function supports both partial updates and function updates:
+
+```typescript
+const useStore = create<State>()((set) => ({
+  count: 0,
+  
+  // Partial update (shallow merge)
+  increment: () => set({ count: 1 }),
+  
+  // Function update (receives current state)
+  incrementBy: (amount: number) => 
+    set((state) => ({ count: state.count + amount })),
+  
+  // Replace entire state (use second parameter)
+  reset: () => set({ count: 0 }, true),
+}))
+```
+
+<Note>
+  By default, `set` performs a shallow merge. Pass `true` as the second argument to replace the state entirely.
+</Note>
+
+## Related
+
+- [createStore](/api/create-store) - Create a vanilla (non-React) store
+- [createWithEqualityFn](/api/create-with-equality-fn) - Create a store with custom equality function

@@ -1,0 +1,242 @@
+---
+title: Installation
+description: Install Zustand and get started with state management in your React application
+---
+
+Zustand is available as a package on npm and can be installed using any popular JavaScript package manager.
+
+## Package managers
+
+Choose your preferred package manager to install Zustand:
+
+<CodeGroup>
+
+```bash npm
+npm install zustand
+```
+
+```bash yarn
+yarn add zustand
+```
+
+```bash pnpm
+pnpm add zustand
+```
+
+```bash bun
+bun add zustand
+```
+
+</CodeGroup>
+
+<Info>
+  Zustand requires **React 16.8+** (the version that introduced hooks). For TypeScript users, TypeScript 4.5+ is recommended for best type inference.
+</Info>
+
+## CDN usage
+
+You can also use Zustand directly from a CDN for quick prototyping or experiments:
+
+<CodeGroup>
+
+```html ESM
+<script type="module">
+  import { create } from 'https://esm.sh/zustand'
+  
+  const useStore = create((set) => ({
+    count: 0,
+    inc: () => set((state) => ({ count: state.count + 1 }))
+  }))
+</script>
+```
+
+```html UMD
+<script src="https://unpkg.com/zustand"></script>
+<script>
+  const { create } = window.zustand
+  
+  const useStore = create((set) => ({
+    count: 0,
+    inc: () => set((state) => ({ count: state.count + 1 }))
+  }))
+</script>
+```
+
+</CodeGroup>
+
+<Warning>
+  CDN imports are suitable for prototypes and learning, but for production applications, use a package manager to ensure proper version control and build optimization.
+</Warning>
+
+## Requirements
+
+### Runtime requirements
+
+- **React**: 16.8.0 or higher (hooks support)
+- **React DOM**: Matches your React version
+
+### Development requirements
+
+For the best development experience:
+
+- **TypeScript**: 4.5.0 or higher (optional, but recommended)
+- **React DevTools**: Browser extension for debugging
+- **Redux DevTools**: Browser extension for using the devtools middleware
+
+## Verify installation
+
+After installation, verify Zustand is working correctly:
+
+<Steps>
+  <Step title="Create a test store">
+    Create a simple store in a new file:
+    
+    ```jsx test-store.js
+    import { create } from 'zustand'
+    
+    export const useTestStore = create((set) => ({
+      message: 'Zustand is installed!',
+      updateMessage: (msg) => set({ message: msg })
+    }))
+    ```
+  </Step>
+  
+  <Step title="Use the store in a component">
+    Import and use your store:
+    
+    ```jsx App.jsx
+    import { useTestStore } from './test-store'
+    
+    function App() {
+      const message = useTestStore((state) => state.message)
+      return <h1>{message}</h1>
+    }
+    ```
+  </Step>
+  
+  <Step title="Run your application">
+    Start your development server and verify the message displays correctly. If you see "Zustand is installed!", you're ready to go!
+  </Step>
+</Steps>
+
+## TypeScript setup
+
+Zustand works out of the box with TypeScript. No additional type packages are needed:
+
+```tsx
+import { create } from 'zustand'
+
+interface StoreState {
+  count: number
+  increment: () => void
+}
+
+const useStore = create<StoreState>()((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 }))
+}))
+```
+
+<Tip>
+  Notice the extra `()` after `create<StoreState>()`? This is required for TypeScript to properly infer types. See the TypeScript guides for more details.
+</Tip>
+
+## Framework integration
+
+Zustand works seamlessly with popular React frameworks:
+
+<Tabs>
+  <Tab title="Next.js">
+    Zustand works with both the Pages Router and App Router:
+    
+    ```bash
+    npm install zustand
+    ```
+    
+    For App Router (React Server Components), ensure stores are only used in Client Components:
+    
+    ```tsx
+    'use client'
+    
+    import { create } from 'zustand'
+    
+    export const useStore = create((set) => ({ ... }))
+    ```
+  </Tab>
+  
+  <Tab title="Vite">
+    Zustand works perfectly with Vite:
+    
+    ```bash
+    npm install zustand
+    ```
+    
+    No additional configuration needed. Just import and use.
+  </Tab>
+  
+  <Tab title="Create React App">
+    Standard installation works:
+    
+    ```bash
+    npm install zustand
+    ```
+    
+    Import and use Zustand in any component.
+  </Tab>
+  
+  <Tab title="Remix">
+    Install normally:
+    
+    ```bash
+    npm install zustand
+    ```
+    
+    Use stores in client-side code. For SSR scenarios, see the SSR guide.
+  </Tab>
+</Tabs>
+
+## React Native
+
+Zustand works great with React Native:
+
+```bash
+npm install zustand
+```
+
+For persistence with AsyncStorage:
+
+```bash
+npm install zustand @react-native-async-storage/async-storage
+```
+
+Then configure the persist middleware with AsyncStorage:
+
+```tsx
+import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+
+const useStore = create(
+  persist(
+    (set) => ({ ... }),
+    {
+      name: 'app-storage',
+      storage: createJSONStorage(() => AsyncStorage)
+    }
+  )
+)
+```
+
+## Next steps
+
+Now that Zustand is installed, you're ready to build your first store:
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Create your first store and use it in components
+  </Card>
+  
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Learn about Zustand's philosophy and key features
+  </Card>
+</CardGroup>

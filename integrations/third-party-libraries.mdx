@@ -1,0 +1,303 @@
+---
+title: Third-Party Libraries
+description: Extend Zustand's functionality with community-created libraries and integrations
+---
+
+Zustand provides bear necessities for state management. Although it is great for most projects, some users wish to extend the library's feature set. This can be done using third-party libraries created by the community.
+
+<Warning>
+These libraries may have bugs, limited maintenance, or other limitations, and are not officially recommended by pmndrs or the Zustand maintainers. This list aims to provide a good starting point for someone looking to extend Zustand's feature set.
+</Warning>
+
+## Developer Tools
+
+Enhance your debugging and development experience with these devtools integrations.
+
+<CardGroup cols={2}>
+  <Card title="zukeeper" icon="bug" href="https://github.com/oslabs-beta/Zukeeper">
+    Native devtools with state and action tracking, diffing, tree display, and time travel
+  </Card>
+  <Card title="simple-zustand-devtools" icon="magnifying-glass" href="https://github.com/beerose/simple-zustand-devtools">
+    Inspect your Zustand store in React DevTools
+  </Card>
+  <Card title="zusty" icon="chart-line" href="https://github.com/oslabs-beta/Zusty">
+    Zustand tool to assist debugging with time travel, action logs, state snapshots, store view, render time metrics and state component tree
+  </Card>
+  <Card title="@csark0812/zustand-expo-devtools" icon="mobile" href="https://github.com/csark0812/zustand-expo-devtools">
+    Connect Zustand to Redux DevTools in Expo + React Native using the official Expo DevTools plugin system
+  </Card>
+</CardGroup>
+
+## Persistence & Synchronization
+
+Libraries for persisting state and syncing across tabs, windows, and devices.
+
+<CardGroup cols={2}>
+  <Card title="persist-and-sync" icon="sync" href="https://github.com/mayank1513/persist-and-sync">
+    Zustand middleware to easily persist and sync Zustand state between tabs/windows/iframes with same origin
+  </Card>
+  <Card title="shared-zustand" icon="share-nodes" href="https://github.com/Tom-Julux/shared-zustand">
+    Cross-tab state sharing for Zustand
+  </Card>
+  <Card title="zustand-sync-tabs" icon="window-restore" href="https://github.com/mayank1513/zustand-sync-tabs">
+    Zustand middleware to easily sync Zustand state between tabs/windows/iframes with same origin
+  </Card>
+  <Card title="use-broadcast-ts" icon="tower-broadcast" href="https://github.com/Romainlg29/use-broadcast">
+    Zustand middleware to share state between tabs
+  </Card>
+  <Card title="zustand-persist" icon="floppy-disk" href="https://github.com/roadmanfong/zustand-persist">
+    A middleware for persisting and rehydrating state
+  </Card>
+  <Card title="zustand-multi-persist" icon="database" href="https://github.com/mooalot/zustand-multi-persist">
+    A middleware for persisting and rehydrating state to multiple storage engines
+  </Card>
+  <Card title="zustand-mmkv-storage" icon="bolt" href="https://github.com/1mehdifaraji/zustand-mmkv-storage">
+    Fast, lightweight MMKV storage adapter for Zustand persist middleware in React Native
+  </Card>
+  <Card title="zustand-interval-persist" icon="clock" href="https://www.npmjs.com/package/zustand-interval-persist">
+    An enhancement for zustand that enables automatic saving of the store's state to the specified storage at regular interval
+  </Card>
+</CardGroup>
+
+## Multiplayer & Real-time Collaboration
+
+Build collaborative applications with real-time state synchronization.
+
+<CardGroup cols={2}>
+  <Card title="@liveblocks/zustand" icon="users" href="https://github.com/liveblocks/liveblocks/tree/main/packages/liveblocks-zustand">
+    Liveblocks middleware to make your application multiplayer
+  </Card>
+  <Card title="@hpkv/zustand-multiplayer" icon="network-wired" href="https://github.com/hpkv-io/zustand-multiplayer/tree/main/packages/zustand-multiplayer">
+    HPKV multiplayer middleware for building realtime collaborative applications
+  </Card>
+  <Card title="zustand-middleware-yjs" icon="code-branch" href="https://github.com/joebobmiles/zustand-middleware-yjs">
+    A middleware for synchronizing Zustand stores with Yjs
+  </Card>
+  <Card title="zustand-yjs" icon="project-diagram" href="https://github.com/tandem-pt/zustand-yjs">
+    Zustand stores for Yjs structures
+  </Card>
+</CardGroup>
+
+## Framework Integrations
+
+Use Zustand with different frameworks and platforms.
+
+<CardGroup cols={2}>
+  <Card title="vue-zustand" icon="vuejs" href="https://github.com/wobsoriano/vue-zustand">
+    State management solution for Vue based on Zustand
+  </Card>
+  <Card title="zustand-vue" icon="vuejs" href="https://github.com/AwesomeDevin/zustand-vue">
+    State management for vue (Vue3 / Vue2) based on zustand
+  </Card>
+  <Card title="solid-zustand" icon="cube" href="https://github.com/wobsoriano/solid-zustand">
+    State management in Solid using Zustand
+  </Card>
+  <Card title="ngx-zustand" icon="angular" href="https://github.com/JoaoPauloLousada/ngx-zustand">
+    A Zustand adapter for Angular
+  </Card>
+  <Card title="zubridge" icon="bridge" href="https://github.com/goosewobbler/zubridge">
+    Use Zustand in cross-platform apps, seamlessly. Supports Electron & Tauri
+  </Card>
+  <Card title="zustand-lit" icon="lightbulb" href="https://github.com/ennjin/zustand-lit">
+    A zustand adapter for lit.js (LitElement)
+  </Card>
+  <Card title="zustand-pub" icon="paper-plane" href="https://github.com/AwesomeDevin/zustand-pub">
+    Cross-Application/Cross-Framework State Management And Sharing based on zustand and zustand-vue for React/Vue
+  </Card>
+</CardGroup>
+
+## State Management Utilities
+
+Enhance your store creation and management with these utilities.
+
+<CardGroup cols={2}>
+  <Card title="@davstack/store" icon="store" href="https://www.npmjs.com/package/@davstack/store">
+    A zustand store factory that auto generates selectors with get/set/use methods, supports inferred types, and makes global / local state management easy
+  </Card>
+  <Card title="zustand-x" icon="gem" href="https://github.com/udecode/zustand-x">
+    Zustand store factory for a best-in-class developer experience
+  </Card>
+  <Card title="auto-zustand-selectors-hook" icon="wand-magic-sparkles" href="https://github.com/Albert-Gao/auto-zustand-selectors-hook">
+    Automatic generation of Zustand hooks with Typescript support
+  </Card>
+  <Card title="zustand-slices" icon="layer-group" href="https://github.com/zustandjs/zustand-slices">
+    A slice utility for Zustand
+  </Card>
+  <Card title="zustand-injectors" icon="syringe" href="https://github.com/zustandjs/zustand-injectors">
+    A sweet way to lazy load slices
+  </Card>
+  <Card title="zustand-namespaces" icon="folder-tree" href="https://github.com/mooalot/zustand-namespaces">
+    One store to rule them all. Namespaced Zustand stores
+  </Card>
+  <Card title="use-zustand" icon="hook" href="https://github.com/zustandjs/use-zustand">
+    Another custom hook to use Zustand vanilla store
+  </Card>
+  <Card title="zustand-utils" icon="screwdriver-wrench" href="https://www.npmjs.com/package/zustand-utils">
+    Utilities for Zustand — a createContext replacement, a devtools wrapper, and a store-updater factory function
+  </Card>
+</CardGroup>
+
+## Computed & Derived State
+
+Create computed and derived values from your Zustand state.
+
+<CardGroup cols={2}>
+  <Card title="zustand-computed" icon="calculator" href="https://github.com/chrisvander/zustand-computed">
+    A Zustand middleware to create computed states
+  </Card>
+  <Card title="zustand-computed-state" icon="function" href="https://github.com/yasintz/zustand-computed-state">
+    Simple middleware to add computed states
+  </Card>
+  <Card title="derive-zustand" icon="arrow-right-arrow-left" href="https://github.com/zustandjs/derive-zustand">
+    A function to create a derived Zustand store from other Zustand stores
+  </Card>
+  <Card title="zustand-middleware-computed-state" icon="gears" href="https://github.com/cmlarsen/zustand-middleware-computed-state">
+    A dead simple middleware for adding computed state to Zustand
+  </Card>
+  <Card title="@csark0812/zustand-getters" icon="arrows-rotate" href="https://github.com/csark0812/zustand-getters">
+    Make JavaScript object getters reactive in Zustand stores — define derived values with `get propertyName()` and they automatically trigger subscription updates when accessed
+  </Card>
+</CardGroup>
+
+## Advanced Patterns & Helpers
+
+Libraries that provide advanced patterns and helper utilities.
+
+<CardGroup cols={2}>
+  <Card title="@colorfy-software/zfy" icon="palette" href="https://colorfy-software.gitbook.io/zfy/">
+    Useful helpers for state management in React with Zustand
+  </Card>
+  <Card title="zustand-mutable" icon="pen-to-square" href="https://github.com/zustandjs/zustand-mutable">
+    A sweet way to use immer-like mutable updates
+  </Card>
+  <Card title="zustand-valtio" icon="heart" href="https://github.com/zustandjs/zustand-valtio">
+    A sweet combination of Zustand and Valtio
+  </Card>
+  <Card title="treeshakable" icon="tree" href="https://github.com/react18-tools/treeshakable">
+    A wrapper for library creators to avoid redundant store creation
+  </Card>
+  <Card title="zustand-boilerplate" icon="code" href="https://github.com/sagiereder/zustand-boilerplate">
+    A tool that automatically generates getters, setters and more for your zustand store
+  </Card>
+  <Card title="zustand-ards" icon="hand-pointer" href="https://github.com/ivoilic/zustand-ards">
+    Simple opinionated utilities for example alternative selector formats and default shallow hooks
+  </Card>
+</CardGroup>
+
+## Specialized Middleware
+
+Middleware for specific use cases and integrations.
+
+<CardGroup cols={2}>
+  <Card title="zundo" icon="rotate-left" href="https://github.com/charkour/zundo">
+    Undo and redo middleware for Zustand, enabling time-travel in your apps
+  </Card>
+  <Card title="zustand-middleware-xstate" icon="diagram-project" href="https://github.com/biowaffeln/zustand-middleware-xstate">
+    A middleware for putting XState state machines into a global Zustand store
+  </Card>
+  <Card title="zustand-xs" icon="robot" href="https://github.com/zustandjs/zustand-xs">
+    XState/store compabile middleware for Zustand
+  </Card>
+  <Card title="zustand-saga" icon="leaf" href="https://github.com/Nowsta/zustand-saga">
+    A Zustand middleware for redux-saga (minus redux)
+  </Card>
+  <Card title="zustand-rx" icon="circle-dot" href="https://github.com/patdx/zustand-rx">
+    A Zustand middleware enabling you to subscribe to a store as an RxJS Observable
+  </Card>
+  <Card title="zustand-querystring" icon="link" href="https://github.com/nitedani/zustand-querystring">
+    A Zustand middleware that syncs the store with the querystring
+  </Card>
+  <Card title="zustand-hash-storage" icon="hashtag" href="https://github.com/MartinGamesCZ/zustand-hash-storage">
+    Zustand middleware for saving state into URL hash, b64 encoded (can be configured) and debounce timer
+  </Card>
+  <Card title="geschichte" icon="clock-rotate-left" href="https://github.com/BowlingX/geschichte">
+    Zustand and Immer-based hook to manage query parameters
+  </Card>
+  <Card title="use-post-message-ts" icon="envelope" href="https://github.com/paulschoen/use-post-message">
+    Zustand middleware for sharing state between cross-origin iframes via postMessage browser method
+  </Card>
+</CardGroup>
+
+## Forms & Data Management
+
+Libraries for managing forms and async data.
+
+<CardGroup cols={2}>
+  <Card title="zustand-forms" icon="list-check" href="https://github.com/Conduct/zustand-forms">
+    Fast, type safe form states as Zustand stores
+  </Card>
+  <Card title="zustorm" icon="fill" href="https://github.com/mooalot/zustorm">
+    A simple and powerful form library for Zustand
+  </Card>
+  <Card title="leo-query" icon="circle-question" href="https://github.com/steaks/leo-query">
+    A simple library to connect async queries to Zustand stores
+  </Card>
+  <Card title="leiten-zustand" icon="arrows-spin" href="https://github.com/hecmatyar/leiten-zustand">
+    Cleans your store from boilerplate for requests and data transformation
+  </Card>
+  <Card title="zustand-async-slice" icon="sliders" href="https://github.com/mym0404/zustand-async-slice">
+    Simple Zustand utility to create Async Slice. TypeScript Fully Supported
+  </Card>
+</CardGroup>
+
+## Optics & Lenses
+
+Functional programming patterns for state manipulation.
+
+<CardGroup cols={2}>
+  <Card title="@dhmk/zustand-lens" icon="glasses" href="https://github.com/dhmk083/dhmk-zustand-lens">
+    Lens support for Zustand
+  </Card>
+  <Card title="@prncss-xyz/zustand-optics" icon="eye" href="https://github.com/prncss-xyz/zustand-optics">
+    An adapter for optics-ts
+  </Card>
+</CardGroup>
+
+## Context & Dependency Injection
+
+Manage store instances and dependencies.
+
+<CardGroup cols={2}>
+  <Card title="zustand-context" icon="sitemap" href="https://github.com/fredericoo/zustand-context">
+    Create a zustand store in React Context, containing an initial value, or use it in your components with isolated, mockable instances
+  </Card>
+  <Card title="zustand-constate" icon="boxes-stacked" href="https://github.com/ntvinhit/zustand-constate">
+    Context-based state management based on Zustand and taking ideas from Constate
+  </Card>
+  <Card title="zustand-di" icon="plug" href="https://github.com/charkour/zustand-di">
+    Use react props to init zustand stores
+  </Card>
+  <Card title="zusteller" icon="truck" href="https://github.com/timkindberg/zusteller">
+    Your global state savior. "Just hooks" + Zustand
+  </Card>
+</CardGroup>
+
+## Type Safety & Developer Experience
+
+Enhance TypeScript support and developer ergonomics.
+
+<CardGroup cols={2}>
+  <Card title="zustand-create-setter-fn" icon="terminal" href="https://www.npmjs.com/package/zustand-create-setter-fn">
+    A fully type safe utility for Zustand that allows you to easily update state using React style setState functions (framework agnostic, doesn't require React)
+  </Card>
+  <Card title="zustand-store-addons" icon="plus" href="https://github.com/Diablow/zustand-store-addons">
+    React state management addons for Zustand
+  </Card>
+</CardGroup>
+
+## Other Integrations
+
+Miscellaneous libraries and integrations.
+
+<CardGroup cols={2}>
+  <Card title="mobz" icon="m" href="https://github.com/2A5F/Mobz">
+    Zustand-style MobX API
+  </Card>
+  <Card title="zoov" icon="cubes" href="https://github.com/InfiniteXyy/zoov">
+    State management solution based on Zustand with Module-like API
+  </Card>
+</CardGroup>
+
+## Contributing
+
+If you've created a library that extends Zustand's functionality, consider contributing to this list by opening a pull request on the [Zustand GitHub repository](https://github.com/pmndrs/zustand).

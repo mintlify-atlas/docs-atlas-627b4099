@@ -1,0 +1,149 @@
+---
+title: Introduction
+description: A small, fast, and scalable state management solution for React with hooks-first ergonomics
+---
+
+Zustand is a small, fast, and scalable state management solution using simplified flux principles. It has a comfy API based on hooks, isn't boilerplatey or opinionated, and provides just enough convention to be explicit and flux-like.
+
+## What is Zustand?
+
+Zustand (German for "state") creates stores that are hooks. You can put anything in them: primitives, objects, functions. State updates are immutable and the `set` function merges state by default to help you manage updates efficiently.
+
+Don't disregard it because it's cute - it has quite the claws! Lots of time was spent dealing with common pitfalls like the dreaded [zombie child problem](https://react-redux.js.org/api/hooks#stale-props-and-zombie-children), [React concurrency](https://github.com/bvaughn/rfcs/blob/useMutableSource/text/0000-use-mutable-source.md), and [context loss](https://github.com/facebook/react/issues/13332) between mixed renderers. It may be the one state manager in the React space that gets all of these right.
+
+## Why use Zustand?
+
+Zustand provides a modern, minimal approach to state management that addresses common pain points:
+
+<CardGroup cols={2}>
+  <Card title="No providers needed" icon="ban">
+    Use your state anywhere without wrapping your app in context providers. Just import and use.
+  </Card>
+  
+  <Card title="Minimal boilerplate" icon="code">
+    Create a store with a single function call. No actions, reducers, or dispatch - just direct state updates.
+  </Card>
+  
+  <Card title="Hooks-first API" icon="hook">
+    Built on React hooks from the ground up. Your store is a hook you can use anywhere.
+  </Card>
+  
+  <Card title="Small bundle size" icon="feather">
+    Tiny footprint with zero dependencies. Perfect for performance-conscious applications.
+  </Card>
+  
+  <Card title="TypeScript support" icon="code">
+    First-class TypeScript support with full type inference out of the box.
+  </Card>
+  
+  <Card title="React concurrency safe" icon="shield">
+    Built to work correctly with React 18 concurrent features and future React versions.
+  </Card>
+</CardGroup>
+
+## Key features
+
+### Simple API surface
+
+Zustand's API is intentionally minimal. The core concepts are:
+
+- **create** - Creates a store hook
+- **set** - Updates state (merges by default)
+- **get** - Reads state outside React
+- **subscribe** - Listens to state changes
+
+### Selective re-renders
+
+Components only re-render when the specific state they selected changes. Use selectors to pick exactly what you need:
+
+```jsx
+// Only re-renders when bears changes
+const bears = useBearStore((state) => state.bears)
+```
+
+### No context providers
+
+Unlike Redux or React Context, Zustand doesn't require wrapping your app in providers. Just create a store and use it:
+
+```jsx
+import { create } from 'zustand'
+
+const useStore = create((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 }))
+}))
+
+// Use anywhere in your app
+function Counter() {
+  const count = useStore((state) => state.count)
+  return <div>{count}</div>
+}
+```
+
+### Transient updates
+
+Zustand supports reading and updating state without causing re-renders, perfect for high-frequency updates like animations or game loops.
+
+### Middleware ecosystem
+
+Extend functionality with official middleware:
+
+- **persist** - Save state to localStorage, sessionStorage, or custom storage
+- **immer** - Use mutable syntax for immutable updates
+- **devtools** - Redux DevTools integration
+- **combine** - Combine multiple stores
+- **subscribeWithSelector** - Subscribe to specific state slices
+
+## Philosophy
+
+Zustand embraces simplicity and flexibility:
+
+<Note>
+  **Un-opinionated by design** - Zustand doesn't force you into a specific pattern. Use it with reducers, with direct updates, with async actions - whatever fits your use case.
+</Note>
+
+- **No magic** - The implementation is straightforward vanilla JavaScript
+- **Framework agnostic core** - The vanilla store works outside React
+- **Escape hatches** - Access state imperatively when needed
+- **Progressive enhancement** - Start simple, add middleware as you need it
+
+## When to use Zustand
+
+Zustand is ideal for:
+
+✅ Shared state across multiple components  
+✅ State that needs to be accessed outside React components  
+✅ Projects that want minimal boilerplate  
+✅ Applications requiring fine-grained render control  
+✅ Teams transitioning from Redux but wanting something lighter  
+
+Consider alternatives when:
+
+❌ You only need local component state (use `useState`)  
+❌ You need atomic, derived state (consider Jotai or Recoil)  
+❌ You prefer mutable state updates (consider Valtio)  
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Build your first Zustand store in minutes
+  </Card>
+  
+  <Card title="API reference" icon="book" href="/api/create">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
+
+## Community and ecosystem
+
+Zustand is part of the [Poimandres](https://github.com/pmndrs) collective, maintained by the same team behind:
+
+- **React Three Fiber** - React renderer for Three.js
+- **Jotai** - Primitive and flexible state management
+- **Valtio** - Proxy-based state management
+- **Zustand** - And of course, this library!
+
+<Info>
+  Join the [Poimandres Discord](https://discord.gg/poimandres) to connect with the community, get help, and share your projects.
+</Info>

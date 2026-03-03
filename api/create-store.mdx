@@ -1,0 +1,230 @@
+---
+title: createStore
+description: Create a vanilla Zustand store without React
+---
+
+The `createStore` function creates a vanilla Zustand store that can be used outside of React or with any UI framework. It returns a store API object instead of a React Hook.
+
+## Import
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createStore } from 'zustand/vanilla'
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    import { createStore } from 'zustand/vanilla'
+    ```
+  </Tab>
+</Tabs>
+
+## Type Signature
+
+```typescript
+function createStore<T, Mos extends [StoreMutatorIdentifier, unknown][] = []>(
+  initializer: StateCreator<T, [], Mos>
+): Mutate<StoreApi<T>, Mos>
+
+// Curried version
+function createStore<T>(): <Mos extends [StoreMutatorIdentifier, unknown][] = []>(
+  initializer: StateCreator<T, [], Mos>
+) => Mutate<StoreApi<T>, Mos>
+```
+
+## Parameters
+
+<ParamField path="initializer" type="StateCreator<T, [], Mos>" required>
+  A function that receives `set`, `get`, and `store` as arguments and returns the initial state object with actions.
+  
+  The function signature is:
+  ```typescript
+  (set: SetState<T>, get: GetState<T>, store: StoreApi<T>) => T
+  ```
+  
+  - `set`: Function to update the state
+  - `get`: Function to get the current state
+  - `store`: The store API object
+</ParamField>
+
+## Returns
+
+<ResponseField name="store" type="StoreApi<T>">
+  A store API object with the following methods:
+  
+  <Expandable title="StoreApi Methods">
+    - **`setState`**: Update the state
+      ```typescript
+      setState(partial: T | Partial<T> | ((state: T) => T | Partial<T>), replace?: boolean): void
+      ```
+    
+    - **`getState`**: Get the current state
+      ```typescript
+      getState(): T
+      ```
+    
+    - **`getInitialState`**: Get the initial state
+      ```typescript
+      getInitialState(): T
+      ```
+    
+    - **`subscribe`**: Subscribe to state changes
+      ```typescript
+      subscribe(listener: (state: T, prevState: T) => void): () => void
+      ```
+      Returns an unsubscribe function.
+  </Expandable>
+</ResponseField>
+
+## Basic Usage
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createStore } from 'zustand/vanilla'
+
+    interface BearState {
+      bears: number
+      increase: () => void
+      decrease: () => void
+    }
+
+    const bearStore = createStore<BearState>()((set) => ({
+      bears: 0,
+      increase: () => set((state) => ({ bears: state.bears + 1 })),
+      decrease: () => set((state) => ({ bears: state.bears - 1 })),
+    }))
+
+    // Get state
+    const currentBears = bearStore.getState().bears
+
+    // Update state
+    bearStore.getState().increase()
+
+    // Subscribe to changes
+    const unsubscribe = bearStore.subscribe((state, prevState) => {
+      console.log('Bears:', state.bears)
+    })
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    import { createStore } from 'zustand/vanilla'
+
+    const bearStore = createStore((set) => ({
+      bears: 0,
+      increase: () => set((state) => ({ bears: state.bears + 1 })),
+      decrease: () => set((state) => ({ bears: state.bears - 1 })),
+    }))
+
+    // Get state
+    const currentBears = bearStore.getState().bears
+
+    // Update state
+    bearStore.getState().increase()
+
+    // Subscribe to changes
+    const unsubscribe = bearStore.subscribe((state, prevState) => {
+      console.log('Bears:', state.bears)
+    })
+    ```
+  </Tab>
+</Tabs>
+
+## Using with React
+
+You can use a vanilla store with React by importing `useStore` from `zustand`:
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+import { useStore } from 'zustand'
+
+const bearStore = createStore<BearState>()((set) => ({
+  bears: 0,
+  increase: () => set((state) => ({ bears: state.bears + 1 })),
+}))
+
+function BearCounter() {
+  const bears = useStore(bearStore, (state) => state.bears)
+  return <h1>{bears} around here...</h1>
+}
+
+function Controls() {
+  const increase = useStore(bearStore, (state) => state.increase)
+  return <button onClick={increase}>Add bear</button>
+}
+```
+
+## Direct State Updates
+
+You can update state directly using `setState`:
+
+```typescript
+// Partial update (shallow merge)
+bearStore.setState({ bears: 10 })
+
+// Function update
+bearStore.setState((state) => ({ bears: state.bears + 1 }))
+
+// Replace entire state
+bearStore.setState({ bears: 0 }, true)
+```
+
+## Vanilla JavaScript Example
+
+Here's a complete vanilla JavaScript example:
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+
+type PositionStore = {
+  position: { x: number; y: number }
+  setPosition: (position: { x: number; y: number }) => void
+}
+
+const positionStore = createStore<PositionStore>()((set) => ({
+  position: { x: 0, y: 0 },
+  setPosition: (position) => set({ position }),
+}))
+
+const dot = document.getElementById('dot')
+const container = document.getElementById('container')
+
+container.addEventListener('pointermove', (e) => {
+  positionStore.getState().setPosition({
+    x: e.clientX,
+    y: e.clientY,
+  })
+})
+
+positionStore.subscribe((state) => {
+  dot.style.transform = `translate(${state.position.x}px, ${state.position.y}px)`
+})
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Framework Agnostic" icon="code">
+    Use Zustand with Vue, Svelte, Angular, or vanilla JavaScript
+  </Card>
+  <Card title="Server-Side" icon="server">
+    Create stores in Node.js environments without React dependencies
+  </Card>
+  <Card title="Testing" icon="flask">
+    Easier to test stores in isolation without React Testing Library
+  </Card>
+  <Card title="Shared State" icon="share-nodes">
+    Share state between React and non-React parts of your application
+  </Card>
+</CardGroup>
+
+<Note>
+  Vanilla stores are the foundation of Zustand. The `create` function from the main package actually uses `createStore` internally and wraps it with a React Hook.
+</Note>
+
+## Related
+
+- [create](/api/create) - Create a React Hook-based store
+- [useStore](/api/use-store) - Use a vanilla store in React components

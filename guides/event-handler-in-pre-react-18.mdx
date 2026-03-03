@@ -1,0 +1,168 @@
+---
+title: Event Handlers in Pre-React 18
+description: Learn how to properly handle actions outside React event handlers in React versions before 18
+---
+
+<Warning>
+This guide is only relevant if you're using React versions **before React 18**. React 18 and later handle batching automatically.
+</Warning>
+
+## The Problem
+
+In React versions before 18, `setState` is handled synchronously when called outside a React event handler. This means updating Zustand state outside an event handler will force React to update components synchronously, which can lead to the [zombie-child effect](https://react-redux.js.org/api/hooks#stale-props-and-zombie-children).
+
+### What is the Zombie-Child Effect?
+
+The zombie-child effect occurs when:
+1. A parent component re-renders
+2. A child component reads stale data before it can re-render
+3. The child makes decisions based on outdated state
+
+## The Solution: unstable_batchedUpdates
+
+Wrap your state updates in `unstable_batchedUpdates` to batch updates and prevent this issue:
+
+```jsx
+import { unstable_batchedUpdates } from 'react-dom' // or 'react-native'
+
+const useFishStore = create((set) => ({
+  fishes: 0,
+  increaseFishes: () => set((prev) => ({ fishes: prev.fishes + 1 })),
+}))
+
+const nonReactCallback = () => {
+  unstable_batchedUpdates(() => {
+    useFishStore.getState().increaseFishes()
+  })
+}
+```
+
+## Common Scenarios
+
+<Tabs>
+  <Tab title="setTimeout">
+    ```jsx
+    import { unstable_batchedUpdates } from 'react-dom'
+
+    // Outside React event handler
+    setTimeout(() => {
+      unstable_batchedUpdates(() => {
+        useFishStore.getState().increaseFishes()
+        useBearStore.getState().increaseBears()
+      })
+    }, 1000)
+    ```
+  </Tab>
+  <Tab title="WebSocket">
+    ```jsx
+    import { unstable_batchedUpdates } from 'react-dom'
+
+    const socket = new WebSocket('ws://localhost:8080')
+
+    socket.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data)
+
+      unstable_batchedUpdates(() => {
+        useMessageStore.getState().addMessage(data)
+        useNotificationStore.getState().incrementUnread()
+      })
+    })
+    ```
+  </Tab>
+  <Tab title="Fetch Callback">
+    ```jsx
+    import { unstable_batchedUpdates } from 'react-dom'
+
+    fetch('/api/data')
+      .then(response => response.json())
+      .then(data => {
+        unstable_batchedUpdates(() => {
+          useDataStore.getState().setData(data)
+          useLoadingStore.getState().setLoading(false)
+        })
+      })
+    ```
+  </Tab>
+  <Tab title="Third-party Library">
+    ```jsx
+    import { unstable_batchedUpdates } from 'react-dom'
+    import someLibrary from 'some-library'
+
+    someLibrary.onEvent((data) => {
+      // Library callback - not a React event handler
+      unstable_batchedUpdates(() => {
+        useStore.getState().updateFromLibrary(data)
+      })
+    })
+    ```
+  </Tab>
+</Tabs>
+
+## When Do You Need This?
+
+<CardGroup cols={2}>
+  <Card title="Need unstable_batchedUpdates" icon="circle-exclamation" color="#f59e0b">
+    - setTimeout/setInterval callbacks
+    - WebSocket message handlers
+    - Fetch/Promise callbacks
+    - Third-party library callbacks
+    - Browser event listeners (addEventListener)
+  </Card>
+  <Card title="Don't Need It" icon="circle-check" color="#10b981">
+    - onClick, onChange, etc. (React synthetic events)
+    - useEffect hooks
+    - React 18+ applications (automatic batching)
+    - Synchronous updates in render
+  </Card>
+</CardGroup>
+
+## React Native
+
+For React Native applications, import from `react-native` instead:
+
+```jsx
+import { unstable_batchedUpdates } from 'react-native'
+
+const nonReactCallback = () => {
+  unstable_batchedUpdates(() => {
+    useFishStore.getState().increaseFishes()
+  })
+}
+```
+
+## Upgrading to React 18
+
+<Info>
+If you upgrade to React 18 or later, you can remove all `unstable_batchedUpdates` calls. React 18 automatically batches all state updates, regardless of where they occur.
+</Info>
+
+### Migration Example
+
+<CodeGroup>
+```jsx React 17 and Earlier
+import { unstable_batchedUpdates } from 'react-dom'
+
+setTimeout(() => {
+  unstable_batchedUpdates(() => {
+    useStore.getState().updateValue()
+  })
+}, 1000)
+```
+
+```jsx React 18+
+// No wrapper needed!
+setTimeout(() => {
+  useStore.getState().updateValue()
+}, 1000)
+```
+</CodeGroup>
+
+## Additional Resources
+
+<Card title="GitHub Issue #302" icon="github" href="https://github.com/pmndrs/zustand/issues/302">
+  Read more details about this issue and the discussion around batched updates in Zustand
+</Card>
+
+<Tip>
+Consider upgrading to React 18 or later to benefit from automatic batching and avoid this complexity altogether.
+</Tip>

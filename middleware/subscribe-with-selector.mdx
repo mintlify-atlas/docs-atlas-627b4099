@@ -1,0 +1,334 @@
+---
+title: subscribeWithSelector
+description: Subscribe to specific slices of state for granular updates
+---
+
+The `subscribeWithSelector` middleware enables subscribing to specific parts of your state. This allows you to react to changes in selected values rather than the entire state, improving performance and code organization.
+
+```typescript
+import { subscribeWithSelector } from 'zustand/middleware'
+
+const useStore = create(
+  subscribeWithSelector((set) => ({
+    position: { x: 0, y: 0 },
+    setPosition: (position) => set({ position }),
+  }))
+)
+
+// Subscribe to just the x coordinate
+const unsubscribe = useStore.subscribe(
+  (state) => state.position.x,
+  (x) => console.log('X changed to:', x)
+)
+```
+
+## Signature
+
+```typescript
+subscribeWithSelector<T>(
+  stateCreator: StateCreator<T, [], []>
+): StateCreator<T, [['zustand/subscribeWithSelector', never]], []>
+```
+
+## Parameters
+
+<ParamField path="stateCreator" type="StateCreator<T>" required>
+  The state creator function that defines your store.
+</ParamField>
+
+## Basic Usage
+
+```typescript
+import { create } from 'zustand'
+import { subscribeWithSelector } from 'zustand/middleware'
+
+type PositionStore = {
+  position: { x: number; y: number }
+  setPosition: (position: { x: number; y: number }) => void
+}
+
+const usePositionStore = create<PositionStore>()(
+  subscribeWithSelector((set) => ({
+    position: { x: 0, y: 0 },
+    setPosition: (position) => set({ position }),
+  }))
+)
+
+// Subscribe to entire position object
+usePositionStore.subscribe(
+  (state) => state.position,
+  (position) => {
+    console.log('Position changed:', position)
+  }
+)
+
+// Subscribe to just x coordinate
+usePositionStore.subscribe(
+  (state) => state.position.x,
+  (x) => {
+    console.log('X changed:', x)
+  }
+)
+```
+
+## Subscription Options
+
+The subscribe method accepts options for fine-grained control:
+
+```typescript
+useStore.subscribe(
+  (state) => state.count,
+  (count, previousCount) => {
+    console.log('Count changed from', previousCount, 'to', count)
+  },
+  {
+    // Custom equality function
+    equalityFn: (a, b) => a === b,
+    // Fire immediately with current value
+    fireImmediately: true,
+  }
+)
+```
+
+<ParamField path="selector" type="(state: T) => U" required>
+  Function to select the slice of state you want to subscribe to.
+</ParamField>
+
+<ParamField path="listener" type="(selectedState: U, previousSelectedState: U) => void" required>
+  Callback invoked when the selected state changes.
+</ParamField>
+
+<ParamField path="options" type="object">
+  <ParamField path="equalityFn" type="(a: U, b: U) => boolean" default="Object.is">
+    Custom equality function to determine if the selected state has changed.
+  </ParamField>
+
+  <ParamField path="fireImmediately" type="boolean" default={false}>
+    If true, the listener is called immediately with the current value.
+  </ParamField>
+</ParamField>
+
+## Custom Equality Function
+
+Use custom equality for complex objects:
+
+```typescript
+import { shallow } from 'zustand/shallow'
+
+type Store = {
+  user: { name: string; age: number }
+  updateUser: (user: Partial<Store['user']>) => void
+}
+
+const useStore = create<Store>()(
+  subscribeWithSelector((set) => ({
+    user: { name: 'John', age: 30 },
+    updateUser: (updates) =>
+      set((state) => ({ user: { ...state.user, ...updates } })),
+  }))
+)
+
+// Only trigger when user object properties actually change
+useStore.subscribe(
+  (state) => state.user,
+  (user) => console.log('User changed:', user),
+  {
+    equalityFn: shallow, // Shallow comparison instead of reference equality
+  }
+)
+```
+
+## Fire Immediately
+
+Get the current value when subscribing:
+
+```typescript
+useStore.subscribe(
+  (state) => state.count,
+  (count) => {
+    // This runs immediately and on every change
+    console.log('Current count:', count)
+  },
+  { fireImmediately: true }
+)
+```
+
+## Multiple Subscriptions
+
+Subscribe to different slices for different purposes:
+
+```typescript
+type Store = {
+  user: { name: string; email: string }
+  settings: { theme: 'light' | 'dark'; notifications: boolean }
+  updateUser: (updates: Partial<Store['user']>) => void
+  updateSettings: (updates: Partial<Store['settings']>) => void
+}
+
+const useStore = create<Store>()(
+  subscribeWithSelector((set) => ({
+    user: { name: 'John', email: 'john@example.com' },
+    settings: { theme: 'light', notifications: true },
+    updateUser: (updates) =>
+      set((state) => ({ user: { ...state.user, ...updates } })),
+    updateSettings: (updates) =>
+      set((state) => ({ settings: { ...state.settings, ...updates } })),
+  }))
+)
+
+// Track user changes
+useStore.subscribe(
+  (state) => state.user,
+  (user) => console.log('User updated:', user)
+)
+
+// Track theme changes
+useStore.subscribe(
+  (state) => state.settings.theme,
+  (theme) => {
+    document.body.className = theme
+  }
+)
+
+// Track notification setting
+useStore.subscribe(
+  (state) => state.settings.notifications,
+  (enabled) => {
+    if (enabled) {
+      console.log('Notifications enabled')
+    }
+  }
+)
+```
+
+## External State Synchronization
+
+```typescript
+const useStore = create<PositionStore>()(
+  subscribeWithSelector((set) => ({
+    position: { x: 0, y: 0 },
+    setPosition: (position) => set({ position }),
+  }))
+)
+
+// Sync with DOM
+const dot = document.getElementById('dot') as HTMLDivElement
+
+useStore.subscribe(
+  (state) => state.position,
+  (position) => {
+    dot.style.transform = `translate(${position.x}px, ${position.y}px)`
+  },
+  { fireImmediately: true }
+)
+
+// Track movement
+dot.addEventListener('mouseenter', () => {
+  const x = Math.random() * window.innerWidth
+  const y = Math.random() * window.innerHeight
+  useStore.getState().setPosition({ x, y })
+})
+```
+
+## Derived Values
+
+Subscribe to computed/derived values:
+
+```typescript
+type CartStore = {
+  items: Array<{ id: string; price: number; quantity: number }>
+  addItem: (item: CartStore['items'][0]) => void
+}
+
+const useCartStore = create<CartStore>()(
+  subscribeWithSelector((set) => ({
+    items: [],
+    addItem: (item) =>
+      set((state) => ({ items: [...state.items, item] })),
+  }))
+)
+
+// Subscribe to total price
+useCartStore.subscribe(
+  (state) => state.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+  (total) => {
+    console.log('Total price:', total)
+  }
+)
+
+// Subscribe to item count
+useCartStore.subscribe(
+  (state) => state.items.length,
+  (count) => {
+    document.title = `Cart (${count})`
+  }
+)
+```
+
+## Cleanup
+
+Always clean up subscriptions:
+
+```typescript
+function useEffect() {
+  const unsubscribe = useStore.subscribe(
+    (state) => state.value,
+    (value) => console.log(value)
+  )
+
+  return () => {
+    unsubscribe() // Clean up on unmount
+  }
+}
+```
+
+## Composing with Other Middleware
+
+```typescript
+import { devtools, persist, subscribeWithSelector } from 'zustand/middleware'
+
+const useStore = create<Store>()(
+  devtools(
+    persist(
+      subscribeWithSelector((set) => ({
+        count: 0,
+        increment: () => set((state) => ({ count: state.count + 1 })),
+      })),
+      { name: 'counter-storage' }
+    ),
+    { name: 'CounterStore' }
+  )
+)
+
+// Still works with middleware composition
+useStore.subscribe(
+  (state) => state.count,
+  (count) => console.log('Count:', count)
+)
+```
+
+## Performance Benefits
+
+Without subscribeWithSelector, you'd need to subscribe to entire state:
+
+```typescript
+// Without subscribeWithSelector - less efficient
+const useStore = create((set) => ({ /* ... */ }))
+
+useStore.subscribe((state) => {
+  // This runs on EVERY state change
+  if (state.position.x !== previousX) {
+    console.log('X changed:', state.position.x)
+  }
+})
+
+// With subscribeWithSelector - more efficient
+const useStore = create(
+  subscribeWithSelector((set) => ({ /* ... */ }))
+)
+
+useStore.subscribe(
+  (state) => state.position.x,
+  (x) => console.log('X changed:', x) // Only runs when x changes
+)
+```

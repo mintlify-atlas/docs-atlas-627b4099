@@ -1,0 +1,248 @@
+---
+title: Flux-Inspired Practices
+description: Recommended patterns for structuring Zustand stores, inspired by Flux and Redux
+---
+
+Although Zustand is unopinionated, we recommend patterns inspired by [Flux](https://github.com/facebookarchive/flux) and [Redux](https://redux.js.org/understanding/thinking-in-redux/three-principles). If you're coming from another library, these patterns should feel familiar.
+
+<Note>
+  Zustand differs from Flux and Redux in some fundamental ways, so terminology may not perfectly align with other libraries.
+</Note>
+
+## Recommended Patterns
+
+### Single Store
+
+<Tip>
+  Your application's global state should be located in a single Zustand store.
+</Tip>
+
+For large applications, Zustand supports [splitting the store into slices](/guides/slices-pattern).
+
+```js
+import { create } from 'zustand'
+
+const useStore = create((set) => ({
+  // All your global state in one place
+  user: null,
+  cart: [],
+  theme: 'light',
+  // ... actions
+}))
+```
+
+### Use `set` / `setState` to Update the Store
+
+<Warning>
+  Always use `set` (or `setState`) to perform updates to your store. This ensures updates are correctly merged and listeners are properly notified.
+</Warning>
+
+<CodeGroup>
+```js Good - Using set
+const useStore = create((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+}))
+```
+
+```js Bad - Direct mutation
+const useStore = create((set) => ({
+  count: 0,
+  increment: () => {
+    useStore.getState().count++ // Don't do this!
+  },
+}))
+```
+</CodeGroup>
+
+### Colocate Store Actions
+
+In Zustand, state can be updated without dispatched actions and reducers. Store actions can be added directly to the store:
+
+```js
+const useBoundStore = create((set) => ({
+  storeSliceA: { value: 0 },
+  storeSliceB: { value: '' },
+  storeSliceC: { value: [] },
+  updateX: () => set((state) => ({ storeSliceA: { value: state.storeSliceA.value + 1 } })),
+  updateY: () => set({ storeSliceB: { value: 'updated' } }),
+}))
+```
+
+<Info>
+  Optionally, by using `setState`, actions can be [located external to the store](/guides/practice-with-no-store-actions).
+</Info>
+
+## Redux-Like Patterns
+
+If you prefer Redux-style reducers, you can define a `dispatch` function:
+
+<Tabs>
+  <Tab title="Manual Dispatch">
+    ```typescript
+    const types = { increase: 'INCREASE', decrease: 'DECREASE' }
+
+    const reducer = (state, { type, by = 1 }) => {
+      switch (type) {
+        case types.increase:
+          return { grumpiness: state.grumpiness + by }
+        case types.decrease:
+          return { grumpiness: state.grumpiness - by }
+      }
+    }
+
+    const useGrumpyStore = create((set) => ({
+      grumpiness: 0,
+      dispatch: (args) => set((state) => reducer(state, args)),
+    }))
+
+    const dispatch = useGrumpyStore((state) => state.dispatch)
+    dispatch({ type: types.increase, by: 2 })
+    ```
+  </Tab>
+
+  <Tab title="Redux Middleware">
+    Use the built-in redux middleware:
+
+    ```typescript
+    import { redux } from 'zustand/middleware'
+
+    const types = { increase: 'INCREASE', decrease: 'DECREASE' }
+
+    const reducer = (state, { type, by = 1 }) => {
+      switch (type) {
+        case types.increase:
+          return { grumpiness: state.grumpiness + by }
+        case types.decrease:
+          return { grumpiness: state.grumpiness - by }
+      }
+    }
+
+    const initialState = { grumpiness: 0 }
+
+    const useReduxStore = create(redux(reducer, initialState))
+    ```
+
+    <Info>
+      The redux middleware wires up your reducer, sets initial state, and adds a dispatch function to both the state and the vanilla API.
+    </Info>
+  </Tab>
+</Tabs>
+
+## Comparison with Flux/Redux
+
+<AccordionGroup>
+  <Accordion title="Single Store vs Multiple Stores">
+    **Flux/Redux**: Encourages a single store
+    
+    **Zustand**: Also recommends a single store, but supports multiple stores if needed
+
+    ```js
+    // Single store (recommended)
+    const useStore = create((set) => ({ /* all state */ }))
+
+    // Multiple stores (if needed)
+    const useUserStore = create((set) => ({ /* user state */ }))
+    const useCartStore = create((set) => ({ /* cart state */ }))
+    ```
+  </Accordion>
+
+  <Accordion title="Actions and Reducers">
+    **Flux/Redux**: Uses action creators and reducers
+    
+    **Zustand**: Actions are just functions in the store
+
+    ```js
+    // Redux-style
+    const increment = () => ({ type: 'INCREMENT' })
+    const reducer = (state, action) => {
+      switch (action.type) {
+        case 'INCREMENT': return { count: state.count + 1 }
+      }
+    }
+
+    // Zustand-style
+    const useStore = create((set) => ({
+      count: 0,
+      increment: () => set((state) => ({ count: state.count + 1 })),
+    }))
+    ```
+  </Accordion>
+
+  <Accordion title="Immutability">
+    **Flux/Redux**: Requires immutable updates with spread operators
+    
+    **Zustand**: Automatically merges top-level state, but you still need to handle nested objects immutably
+
+    ```js
+    // Both require immutability for nested objects
+    set((state) => ({
+      nested: { ...state.nested, updated: true }
+    }))
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Side Effects and Async Actions
+
+Another way to update the store is through functions that wrap state updates and handle side effects:
+
+```js
+import { create } from 'zustand'
+
+const useStore = create((set, get) => ({
+  user: null,
+  loading: false,
+  error: null,
+  
+  fetchUser: async (id) => {
+    set({ loading: true, error: null })
+    
+    try {
+      const response = await fetch(`/api/users/${id}`)
+      const user = await response.json()
+      set({ user, loading: false })
+    } catch (error) {
+      set({ error: error.message, loading: false })
+    }
+  },
+}))
+```
+
+<Tip>
+  For non-reactive usage outside of components, see the [Zustand README](https://github.com/pmndrs/zustand#readingwriting-state-and-reacting-to-changes-outside-of-components).
+</Tip>
+
+## Best Practices Summary
+
+<CardGroup cols={2}>
+  <Card title="Single Store" icon="database">
+    Keep global state in one store, use slices for organization
+  </Card>
+  <Card title="Use set/setState" icon="pen">
+    Always update state through `set` for proper reactivity
+  </Card>
+  <Card title="Colocate Actions" icon="layer-group">
+    Define actions alongside state for better encapsulation
+  </Card>
+  <Card title="Handle Side Effects" icon="bolt">
+    Wrap async operations in actions for centralized logic
+  </Card>
+</CardGroup>
+
+## Related Guides
+
+<CardGroup cols={2}>
+  <Card title="Slices Pattern" icon="puzzle-piece" href="/guides/slices-pattern">
+    Split large stores into modular slices
+  </Card>
+  <Card title="No Store Actions" icon="external-link" href="/guides/practice-with-no-store-actions">
+    Alternative pattern with external actions
+  </Card>
+  <Card title="Immutable State" icon="lock" href="/guides/immutable-state-and-merging">
+    Understanding state merging and immutability
+  </Card>
+  <Card title="Redux Middleware" icon="gears" href="/middleware/redux">
+    Use Redux patterns with middleware
+  </Card>
+</CardGroup>

@@ -1,0 +1,527 @@
+---
+title: TypeScript Guide
+description: Learn how to use Zustand with TypeScript for type-safe state management
+---
+
+Zustand is a lightweight state manager that pairs perfectly with TypeScript. With TypeScript, you get a strongly typed store—state, actions, and selectors—with autocomplete and compile-time safety.
+
+## Getting Started
+
+This guide covers two levels of TypeScript usage with Zustand:
+
+<CardGroup cols={2}>
+  <Card title="Beginner Guide" icon="graduation-cap" href="#beginner-typescript">
+    Start here for basic TypeScript patterns, type-safe stores, and essential middleware
+  </Card>
+  <Card title="Advanced Guide" icon="code" href="#advanced-typescript">
+    Deep dive into advanced patterns, custom middlewares, and type system details
+  </Card>
+</CardGroup>
+
+## Beginner TypeScript
+
+Zustand with TypeScript provides type-safe state management without reducers, context, or boilerplate.
+
+### Creating a Typed Store
+
+Define your state and actions using a TypeScript interface. The `<BearState>` generic forces the store to match this shape.
+
+```ts
+import { create } from 'zustand'
+
+// Define types for state & actions
+interface BearState {
+  bears: number
+  food: string
+  feed: (food: string) => void
+}
+
+// Create store using the curried form of `create`
+export const useBearStore = create<BearState>()((set) => ({
+  bears: 2,
+  food: 'honey',
+  feed: (food) => set(() => ({ food })),
+}))
+```
+
+<Note>
+Notice the double parentheses `create<BearState>()((set) => ...)`. The curried syntax is required for proper type inference.
+</Note>
+
+### Using the Store in Components
+
+Selectors like `(s) => s.bears` subscribe to only what you need, reducing re-renders and improving performance.
+
+```tsx
+import { useBearStore } from './store'
+
+function BearCounter() {
+  // Select only 'bears' to avoid unnecessary re-renders
+  const bears = useBearStore((s) => s.bears)
+  return <h1>{bears} bears around</h1>
+}
+```
+
+### Resetting the Store
+
+Use `typeof initialState` to avoid repeating property types. TypeScript updates automatically if `initialState` changes.
+
+```tsx
+import { create } from 'zustand'
+
+const initialState = { bears: 0, food: 'honey' }
+
+// Reuse state type dynamically
+type BearState = typeof initialState & {
+  increase: (by: number) => void
+  reset: () => void
+}
+
+const useBearStore = create<BearState>()((set) => ({
+  ...initialState,
+  increase: (by) => set((s) => ({ bears: s.bears + by })),
+  reset: () => set(initialState),
+}))
+
+function ResetZoo() {
+  const { bears, increase, reset } = useBearStore()
+
+  return (
+    <div>
+      <div>{bears}</div>
+      <button onClick={() => increase(5)}>Increase by 5</button>
+      <button onClick={reset}>Reset</button>
+    </div>
+  )
+}
+```
+
+### Extracting Types
+
+Zustand provides `ExtractState` to extract your store's type for tests, utility functions, or component props.
+
+```ts
+import { create, type ExtractState } from 'zustand'
+
+export const useBearStore = create((set) => ({
+  bears: 3,
+  food: 'honey',
+  increase: (by: number) => set((s) => ({ bears: s.bears + by })),
+}))
+
+// Extract the type of the whole store state
+export type BearState = ExtractState<typeof useBearStore>
+```
+
+<Accordion title="Using extracted types in tests">
+```ts
+import { BearState } from './store.ts'
+
+test('should reset store', () => {
+  const snapshot: BearState = useBearStore.getState()
+  expect(snapshot.bears).toBeGreaterThanOrEqual(0)
+})
+```
+</Accordion>
+
+### Working with Selectors
+
+<Tabs>
+  <Tab title="Multiple Selectors">
+    When selecting multiple properties, wrap with `useShallow` to prevent unnecessary re-renders:
+
+    ```tsx
+    import { create } from 'zustand'
+    import { useShallow } from 'zustand/react/shallow'
+
+    interface BearState {
+      bears: number
+      food: number
+    }
+
+    const useBearStore = create<BearState>()(() => ({
+      bears: 2,
+      food: 10,
+    }))
+
+    function MultipleSelectors() {
+      const { bears, food } = useBearStore(
+        useShallow((state) => ({ bears: state.bears, food: state.food })),
+      )
+
+      return (
+        <div>
+          We have {food} units of food for {bears} bears
+        </div>
+      )
+    }
+    ```
+  </Tab>
+  <Tab title="Derived State">
+    Compute values from existing state using selectors instead of storing them:
+
+    ```tsx
+    import { create } from 'zustand'
+
+    interface BearState {
+      bears: number
+      foodPerBear: number
+    }
+
+    const useBearStore = create<BearState>()(() => ({
+      bears: 3,
+      foodPerBear: 2,
+    }))
+
+    function TotalFood() {
+      // Derived value: required food for all bears
+      const totalFood = useBearStore((s) => s.bears * s.foodPerBear)
+
+      return <div>We need {totalFood} jars of honey</div>
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Middlewares with TypeScript
+
+<Accordion title="combine - Separate state and actions">
+  This middleware automatically infers types from state and actions:
+
+  ```ts
+  import { create } from 'zustand'
+  import { combine } from 'zustand/middleware'
+
+  export const useBearStore = create(
+    combine({ bears: 0 }, (set) => ({
+      increase: () => set((s) => ({ bears: s.bears + 1 })),
+    })),
+  )
+  ```
+</Accordion>
+
+<Accordion title="devtools - Redux DevTools integration">
+  Connect Zustand to Redux DevTools for debugging:
+
+  ```ts
+  import { create } from 'zustand'
+  import { devtools } from 'zustand/middleware'
+
+  interface BearState {
+    bears: number
+    increase: () => void
+  }
+
+  export const useBearStore = create<BearState>()(
+    devtools((set) => ({
+      bears: 0,
+      increase: () => set((s) => ({ bears: s.bears + 1 })),
+    })),
+  )
+  ```
+</Accordion>
+
+<Accordion title="persist - LocalStorage persistence">
+  Keep your store in localStorage across page refreshes:
+
+  ```ts
+  import { create } from 'zustand'
+  import { persist } from 'zustand/middleware'
+
+  interface BearState {
+    bears: number
+    increase: () => void
+  }
+
+  export const useBearStore = create<BearState>()(
+    persist(
+      (set) => ({
+        bears: 0,
+        increase: () => set((s) => ({ bears: s.bears + 1 })),
+      }),
+      { name: 'bear-storage' },
+    ),
+  )
+  ```
+</Accordion>
+
+### Async Actions
+
+Actions can be async to fetch remote data. TypeScript enforces correct API response types.
+
+```ts
+import { create } from 'zustand'
+
+interface BearData {
+  count: number
+}
+
+interface BearState {
+  bears: number
+  fetchBears: () => Promise<void>
+}
+
+export const useBearStore = create<BearState>()((set) => ({
+  bears: 0,
+  fetchBears: async () => {
+    const res = await fetch('/api/bears')
+    const data: BearData = await res.json()
+    set({ bears: data.count })
+  },
+}))
+```
+
+### Multiple Stores
+
+Create separate stores for different domains. TypeScript ensures each store has its own strict type.
+
+```tsx
+import { create } from 'zustand'
+
+interface BearState {
+  bears: number
+  addBear: () => void
+}
+
+const useBearStore = create<BearState>()((set) => ({
+  bears: 2,
+  addBear: () => set((s) => ({ bears: s.bears + 1 })),
+}))
+
+interface FishState {
+  fish: number
+  addFish: () => void
+}
+
+const useFishStore = create<FishState>()((set) => ({
+  fish: 5,
+  addFish: () => set((s) => ({ fish: s.fish + 1 })),
+}))
+
+function Zoo() {
+  const { bears, addBear } = useBearStore()
+  const { fish, addFish } = useFishStore()
+
+  return (
+    <div>
+      <div>{bears} bears and {fish} fish</div>
+      <button onClick={addBear}>Add bear</button>
+      <button onClick={addFish}>Add fish</button>
+    </div>
+  )
+}
+```
+
+## Advanced TypeScript
+
+### Why the Curried Syntax?
+
+The difference when using TypeScript is writing `create<T>()(...)` instead of `create(...)`.
+
+<Accordion title="Why can't we infer the type from initial state?">
+  **TLDR**: Because state generic `T` is invariant.
+
+  Consider this minimal version of `create`:
+
+  ```ts
+  declare const create: <T>(f: (get: () => T) => T) => T
+
+  const x = create((get) => ({
+    foo: 0,
+    bar: () => get(),
+  }))
+  // `x` is inferred as `unknown` instead of the expected type
+  ```
+
+  The type `f` in `create` is `(get: () => T) => T`, which both "gives" `T` (covariant) and "takes" `T` (contravariant). This makes `T` invariant, and TypeScript cannot infer it.
+</Accordion>
+
+<Accordion title="Why the currying ()(...)? ">
+  **TLDR**: It's a workaround for [microsoft/TypeScript#10571](https://github.com/microsoft/TypeScript/issues/10571).
+
+  The curried version allows you to annotate some generics while letting others be inferred. For example:
+
+  ```ts
+  declare const withError: {
+    <E>(): <T>(
+      p: Promise<T>,
+    ) => Promise<[error: undefined, value: T] | [error: E, value: undefined]>
+  }
+
+  const main = async () => {
+    let [error, value] = await withError<Foo>()(doSomething())
+  }
+  ```
+
+  This way, `T` gets inferred while you annotate `E`.
+</Accordion>
+
+### Using combine for Type Inference
+
+Alternatively, use `combine` which infers the state automatically:
+
+```ts
+import { create } from 'zustand'
+import { combine } from 'zustand/middleware'
+
+const useBearStore = create(
+  combine({ bears: 0 }, (set) => ({
+    increase: (by: number) => set((state) => ({ bears: state.bears + by })),
+  })),
+)
+```
+
+<Warning>
+  `combine` trades a little type-safety for convenience. The `get`, `set`, and `store` parameters are typed as if state is only the first parameter, when it's actually the merge of both parameters. Be careful with `replace` flag and `Object.keys`.
+</Warning>
+
+### Using Middlewares
+
+You don't need to do anything special to use middlewares in TypeScript:
+
+```ts
+import { create } from 'zustand'
+import { devtools, persist } from 'zustand/middleware'
+
+interface BearState {
+  bears: number
+  increase: (by: number) => void
+}
+
+const useBearStore = create<BearState>()(
+  devtools(
+    persist(
+      (set) => ({
+        bears: 0,
+        increase: (by) => set((state) => ({ bears: state.bears + by })),
+      }),
+      { name: 'bearStore' },
+    ),
+  ),
+)
+```
+
+<Tip>
+  Use `devtools` as the outermost middleware. For example, `devtools(immer(...))` not `immer(devtools(...))`. This ensures `devtools` can properly mutate `setState` without losing type information.
+</Tip>
+
+### Common Recipes
+
+<AccordionGroup>
+  <Accordion title="Middleware that doesn't change the store type">
+    ```ts
+    import { create, StateCreator, StoreMutatorIdentifier } from 'zustand'
+
+    type Logger = <
+      T,
+      Mps extends [StoreMutatorIdentifier, unknown][] = [],
+      Mcs extends [StoreMutatorIdentifier, unknown][] = [],
+    >(
+      f: StateCreator<T, Mps, Mcs>,
+      name?: string,
+    ) => StateCreator<T, Mps, Mcs>
+
+    type LoggerImpl = <T>(
+      f: StateCreator<T, [], []>,
+      name?: string,
+    ) => StateCreator<T, [], []>
+
+    const loggerImpl: LoggerImpl = (f, name) => (set, get, store) => {
+      const loggedSet: typeof set = (...a) => {
+        set(...(a as Parameters<typeof set>))
+        console.log(...(name ? [`${name}:`] : []), get())
+      }
+      const setState = store.setState
+      store.setState = (...a) => {
+        setState(...(a as Parameters<typeof setState>))
+        console.log(...(name ? [`${name}:`] : []), store.getState())
+      }
+
+      return f(loggedSet, get, store)
+    }
+
+    export const logger = loggerImpl as unknown as Logger
+    ```
+  </Accordion>
+
+  <Accordion title="Slices Pattern with TypeScript">
+    ```ts
+    import { create, StateCreator } from 'zustand'
+
+    interface BearSlice {
+      bears: number
+      addBear: () => void
+      eatFish: () => void
+    }
+
+    interface FishSlice {
+      fishes: number
+      addFish: () => void
+    }
+
+    const createBearSlice: StateCreator<
+      BearSlice & FishSlice,
+      [],
+      [],
+      BearSlice
+    > = (set) => ({
+      bears: 0,
+      addBear: () => set((state) => ({ bears: state.bears + 1 })),
+      eatFish: () => set((state) => ({ fishes: state.fishes - 1 })),
+    })
+
+    const createFishSlice: StateCreator<
+      BearSlice & FishSlice,
+      [],
+      [],
+      FishSlice
+    > = (set) => ({
+      fishes: 0,
+      addFish: () => set((state) => ({ fishes: state.fishes + 1 })),
+    })
+
+    const useBoundStore = create<BearSlice & FishSlice>()((...a) => ({
+      ...createBearSlice(...a),
+      ...createFishSlice(...a),
+    }))
+    ```
+  </Accordion>
+
+  <Accordion title="Bounded useStore hook for vanilla stores">
+    ```ts
+    import { useStore } from 'zustand'
+    import { createStore } from 'zustand/vanilla'
+
+    interface BearState {
+      bears: number
+      increase: (by: number) => void
+    }
+
+    const bearStore = createStore<BearState>()((set) => ({
+      bears: 0,
+      increase: (by) => set((state) => ({ bears: state.bears + by })),
+    }))
+
+    function useBearStore(): BearState
+    function useBearStore<T>(selector: (state: BearState) => T): T
+    function useBearStore<T>(selector?: (state: BearState) => T) {
+      return useStore(bearStore, selector!)
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Middlewares and Their Mutators
+
+When using middlewares with `StateCreator`, reference these mutator types:
+
+- `devtools` — `["zustand/devtools", never]`
+- `persist` — `["zustand/persist", YourPersistedState]`
+- `immer` — `["zustand/immer", never]`
+- `subscribeWithSelector` — `["zustand/subscribeWithSelector", never]`
+- `redux` — `["zustand/redux", YourAction]`
+- `combine` — no mutator (doesn't mutate the store)
+
+## Conclusion
+
+Zustand with TypeScript provides a perfect balance: simple, minimalistic stores with the safety of strong typing. Start with basic patterns and expand gradually with middlewares and advanced techniques as needed.

@@ -1,0 +1,173 @@
+---
+title: 'shallow'
+description: 'Utility function for shallow equality comparison'
+---
+
+`shallow` is a utility function that performs shallow equality comparison between two values.
+
+## Import
+
+```tsx
+import { shallow } from 'zustand/shallow'
+```
+
+## Signature
+
+```tsx
+function shallow<T>(valueA: T, valueB: T): boolean
+```
+
+## Parameters
+
+<ParamField path="valueA" type="T" required>
+  The first value to compare
+</ParamField>
+
+<ParamField path="valueB" type="T" required>
+  The second value to compare
+</ParamField>
+
+## Returns
+
+<ResponseField name="equal" type="boolean">
+  Returns `true` if the values are shallowly equal, `false` otherwise
+</ResponseField>
+
+## Usage
+
+### Comparing primitives
+
+```tsx
+import { shallow } from 'zustand/shallow'
+
+shallow('John Doe', 'John Doe')  // true
+shallow(10, 10)                   // true
+shallow(true, true)               // true
+shallow(1n, 1n)                   // true
+```
+
+### Comparing objects
+
+```tsx
+const objA = { firstName: 'John', lastName: 'Doe', age: 30 }
+const objB = { firstName: 'John', lastName: 'Doe', age: 30 }
+
+Object.is(objA, objB)  // false (different references)
+shallow(objA, objB)     // true (same properties and values)
+```
+
+### Comparing nested objects (limitation)
+
+```tsx
+const objA = {
+  name: 'John',
+  address: { city: 'New York', zip: '10001' }
+}
+const objB = {
+  name: 'John',
+  address: { city: 'New York', zip: '10001' }
+}
+
+shallow(objA, objB)  // false (nested objects have different references)
+```
+
+<Warning>
+Shallow comparison only checks top-level properties. Nested objects are compared by reference, not by value.
+</Warning>
+
+### Comparing arrays
+
+```tsx
+const arrA = [1, 2, 3]
+const arrB = [1, 2, 3]
+
+shallow(arrA, arrB)  // true (same length and elements)
+```
+
+### Comparing Sets
+
+```tsx
+const setA = new Set([1, 2, 3])
+const setB = new Set([1, 2, 3])
+
+shallow(setA, setB)  // true (same elements)
+```
+
+### Comparing Maps
+
+```tsx
+const mapA = new Map([['a', 1], ['b', 2]])
+const mapB = new Map([['a', 1], ['b', 2]])
+
+shallow(mapA, mapB)  // true (same key-value pairs)
+```
+
+## Use with zustand
+
+### As an equality function
+
+```tsx
+import { create } from 'zustand'
+import { shallow } from 'zustand/shallow'
+
+type State = {
+  user: { name: string; age: number }
+  settings: { theme: string }
+}
+
+const useStore = create<State>()(() => ({
+  user: { name: 'John', age: 30 },
+  settings: { theme: 'dark' },
+}))
+
+function Component() {
+  const user = useStore(
+    (state) => state.user,
+    shallow  // Prevents re-render if user object has same properties
+  )
+}
+```
+
+### With useStoreWithEqualityFn
+
+```tsx
+import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { shallow } from 'zustand/shallow'
+
+function Component() {
+  const { name, age } = useStoreWithEqualityFn(
+    store,
+    (state) => ({ name: state.user.name, age: state.user.age }),
+    shallow
+  )
+}
+```
+
+## How it works
+
+1. **Reference equality**: First checks if `valueA` and `valueB` are the same reference using `Object.is`
+2. **Type checking**: Returns `false` if either value is not an object or is `null`
+3. **Prototype check**: Returns `false` if objects have different prototypes
+4. **Iterable comparison**: For iterables (arrays, Sets, Maps), compares elements/entries
+5. **Object comparison**: For plain objects, compares all enumerable properties
+
+## Prototype checking
+
+```tsx
+const a = Object.create({})  // prototype is {}
+const b = {}                  // prototype is Object.prototype
+
+shallow(a, b)  // false (different prototypes)
+```
+
+<Info>
+Objects created with `{}` or `new Object()` inherit from `Object.prototype`, while `Object.create(proto)` can have a custom prototype.
+</Info>
+
+## Notes
+
+- Shallow comparison is fast and suitable for most cases
+- Only compares top-level properties by value
+- Nested objects/arrays are compared by reference
+- For deep equality, consider using a deep equality library like `lodash.isEqual`
+- Commonly used with `useStoreWithEqualityFn` to optimize re-renders

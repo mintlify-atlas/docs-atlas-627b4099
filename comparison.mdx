@@ -1,0 +1,510 @@
+---
+title: Comparison
+description: How Zustand compares to Redux, Context API, Jotai, Valtio, Recoil, and other state management solutions
+---
+
+Zustand is one of many state management libraries for React. This guide compares Zustand with popular alternatives to help you understand when and why to choose each one.
+
+## At a glance
+
+| Feature | Zustand | Redux | Context API | Jotai | Valtio | Recoil |
+|---------|---------|-------|-------------|-------|--------|--------|
+| Bundle size | ~1KB | ~3KB (RTK) | 0KB (built-in) | ~3KB | ~3KB | ~14KB |
+| Boilerplate | Minimal | Medium | Low | Minimal | Minimal | Medium |
+| Providers needed | No | Yes | Yes | Yes | No | Yes |
+| State model | Immutable | Immutable | Any | Immutable | Mutable | Immutable |
+| Selectors | Manual | Manual | Manual | Automatic | Automatic | Automatic |
+| DevTools | Via middleware | Built-in | No | Via tools | Via tools | Built-in |
+| TypeScript | Excellent | Excellent | Good | Excellent | Excellent | Good |
+| Learning curve | Low | Medium-High | Low | Medium | Low | Medium |
+
+## Zustand vs Redux
+
+### Overview
+
+Both Zustand and Redux are based on immutable state models with unidirectional data flow. However, they differ significantly in API design and requirements.
+
+### Key differences
+
+<CardGroup cols={2}>
+  <Card title="No providers" icon="ban">
+    Zustand doesn't require context providers, while Redux needs `<Provider>` wrapping your app.
+  </Card>
+  
+  <Card title="Less boilerplate" icon="code">
+    Zustand needs just one function call. Redux requires actions, reducers, and action creators.
+  </Card>
+  
+  <Card title="Hooks-first" icon="hook">
+    Zustand is built on hooks. Redux added hooks later to complement connect().
+  </Card>
+  
+  <Card title="Smaller bundle" icon="feather">
+    Zustand is ~1KB, Redux Toolkit is ~3KB.
+  </Card>
+</CardGroup>
+
+### Code comparison
+
+<Tabs>
+  <Tab title="Zustand">
+    ```tsx
+    import { create } from 'zustand'
+    
+    type State = {
+      count: number
+    }
+    
+    type Actions = {
+      increment: (qty: number) => void
+      decrement: (qty: number) => void
+    }
+    
+    const useCountStore = create<State & Actions>((set) => ({
+      count: 0,
+      increment: (qty: number) => set((state) => ({ count: state.count + qty })),
+      decrement: (qty: number) => set((state) => ({ count: state.count - qty })),
+    }))
+    
+    // Use anywhere, no provider needed
+    function Counter() {
+      const count = useCountStore((state) => state.count)
+      const increment = useCountStore((state) => state.increment)
+      return <button onClick={() => increment(1)}>{count}</button>
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Redux Toolkit">
+    ```tsx
+    import { createSlice, configureStore } from '@reduxjs/toolkit'
+    import { Provider, useSelector, useDispatch } from 'react-redux'
+    
+    const countSlice = createSlice({
+      name: 'count',
+      initialState: { value: 0 },
+      reducers: {
+        incremented: (state, action) => {
+          state.value += action.payload
+        },
+        decremented: (state, action) => {
+          state.value -= action.payload
+        },
+      },
+    })
+    
+    const store = configureStore({ reducer: countSlice.reducer })
+    
+    // Need provider wrapper
+    function App() {
+      return (
+        <Provider store={store}>
+          <Counter />
+        </Provider>
+      )
+    }
+    
+    function Counter() {
+      const count = useSelector((state) => state.value)
+      const dispatch = useDispatch()
+      return (
+        <button onClick={() => dispatch(countSlice.actions.incremented(1))}>
+          {count}
+        </button>
+      )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### When to use Redux over Zustand
+
+Choose Redux if you:
+
+- Need comprehensive DevTools out of the box
+- Want strict architectural patterns enforced
+- Have a team familiar with Redux patterns
+- Need extensive middleware ecosystem
+- Prefer separation of actions and reducers
+
+## Zustand vs Context API
+
+### Overview
+
+React's Context API is built-in and works well for simple state sharing. Zustand is a dedicated state management library with more features.
+
+### Key differences
+
+<Tabs>
+  <Tab title="Context API">
+    **Pros:**
+    - Built into React, no dependencies
+    - Simple for small-scale state sharing
+    - Natural React patterns
+    
+    **Cons:**
+    - All consumers re-render when context changes
+    - Requires provider boilerplate
+    - No built-in selector optimization
+    - Verbose for complex state
+  </Tab>
+  
+  <Tab title="Zustand">
+    **Pros:**
+    - Selective re-renders with selectors
+    - No provider needed
+    - Less boilerplate
+    - Can access state outside React
+    - Built-in state merging
+    
+    **Cons:**
+    - Additional dependency (~1KB)
+    - New API to learn
+  </Tab>
+</Tabs>
+
+### Code comparison
+
+<Tabs>
+  <Tab title="Context API">
+    ```tsx
+    import { createContext, useContext, useState } from 'react'
+    
+    const CountContext = createContext(null)
+    
+    function CountProvider({ children }) {
+      const [count, setCount] = useState(0)
+      const increment = () => setCount(c => c + 1)
+      
+      return (
+        <CountContext.Provider value={{ count, increment }}>
+          {children}
+        </CountContext.Provider>
+      )
+    }
+    
+    function Counter() {
+      const { count, increment } = useContext(CountContext)
+      return <button onClick={increment}>{count}</button>
+    }
+    
+    // Need to wrap app
+    function App() {
+      return (
+        <CountProvider>
+          <Counter />
+        </CountProvider>
+      )
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Zustand">
+    ```tsx
+    import { create } from 'zustand'
+    
+    const useCountStore = create((set) => ({
+      count: 0,
+      increment: () => set((state) => ({ count: state.count + 1 })),
+    }))
+    
+    // Use directly, no provider
+    function Counter() {
+      const count = useCountStore((state) => state.count)
+      const increment = useCountStore((state) => state.increment)
+      return <button onClick={increment}>{count}</button>
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  **Context API performance gotcha**: All components using a context re-render when any part of the context value changes, even if they only use a small piece of it.
+</Warning>
+
+## Zustand vs Jotai
+
+### Overview
+
+Both are from the Poimandres collective. Zustand uses a single store approach, while Jotai uses atomic state.
+
+### State model differences
+
+<Tabs>
+  <Tab title="Zustand - Single Store">
+    ```tsx
+    import { create } from 'zustand'
+    
+    type State = {
+      count: number
+      name: string
+    }
+    
+    type Actions = {
+      updateCount: (fn: (count: number) => number) => void
+      updateName: (name: string) => void
+    }
+    
+    const useStore = create<State & Actions>((set) => ({
+      count: 0,
+      name: 'John',
+      updateCount: (fn) => set((state) => ({ count: fn(state.count) })),
+      updateName: (name) => set({ name }),
+    }))
+    
+    // All state in one place
+    ```
+  </Tab>
+  
+  <Tab title="Jotai - Atomic State">
+    ```tsx
+    import { atom } from 'jotai'
+    
+    // Separate atoms for each piece of state
+    const countAtom = atom(0)
+    const nameAtom = atom('John')
+    
+    // Derived atoms
+    const doubleCountAtom = atom((get) => get(countAtom) * 2)
+    ```
+  </Tab>
+</Tabs>
+
+### When to choose each
+
+**Choose Zustand if you:**
+- Prefer a single source of truth
+- Want to define all state and actions together
+- Like Redux-style centralized state
+- Need to access state outside React easily
+
+**Choose Jotai if you:**
+- Prefer atomic, composable state
+- Want automatic derived state
+- Like bottom-up state composition
+- Need fine-grained dependency tracking
+
+## Zustand vs Valtio
+
+### Overview
+
+Valtio and Zustand are both from Poimandres, but use fundamentally different state models.
+
+### Immutable vs mutable
+
+<Tabs>
+  <Tab title="Zustand - Immutable">
+    ```tsx
+    import { create } from 'zustand'
+    
+    type State = {
+      obj: { count: number }
+    }
+    
+    const useStore = create<State>((set) => ({
+      obj: { count: 0 }
+    }))
+    
+    // Update immutably
+    useStore.setState((prev) => ({
+      obj: { count: prev.obj.count + 1 }
+    }))
+    ```
+  </Tab>
+  
+  <Tab title="Valtio - Mutable">
+    ```tsx
+    import { proxy } from 'valtio'
+    
+    const state = proxy({ obj: { count: 0 } })
+    
+    // Update with mutations
+    state.obj.count += 1
+    ```
+  </Tab>
+</Tabs>
+
+### Render optimization
+
+<Note>
+  **Zustand** requires manual selectors for optimization, while **Valtio** automatically tracks property access.
+</Note>
+
+**Choose Zustand if you:**
+- Prefer immutable updates
+- Want explicit control over re-renders
+- Like Redux-style patterns
+
+**Choose Valtio if you:**
+- Prefer mutable updates
+- Want automatic render optimization
+- Like Vue/MobX-style reactivity
+
+## Zustand vs Recoil
+
+### Overview
+
+Recoil is Facebook's experimental state management library using atomic state with string keys.
+
+### Key differences
+
+<CardGroup cols={2}>
+  <Card title="Atoms" icon="atom">
+    Recoil uses atoms with string keys, Zustand uses a single store or vanilla stores.
+  </Card>
+  
+  <Card title="Providers" icon="ban">
+    Recoil requires `<RecoilRoot>`, Zustand doesn't need providers.
+  </Card>
+  
+  <Card title="Experimental" icon="flask">
+    Recoil is experimental, Zustand is production-ready.
+  </Card>
+  
+  <Card title="Bundle size" icon="feather">
+    Zustand ~1KB, Recoil ~14KB.
+  </Card>
+</CardGroup>
+
+### Code comparison
+
+<Tabs>
+  <Tab title="Zustand">
+    ```tsx
+    import { create } from 'zustand'
+    
+    type State = {
+      count: number
+    }
+    
+    type Actions = {
+      setCount: (fn: (count: number) => number) => void
+    }
+    
+    const useCountStore = create<State & Actions>((set) => ({
+      count: 0,
+      setCount: (fn) => set((state) => ({ count: fn(state.count) })),
+    }))
+    
+    function Component() {
+      const count = useCountStore((state) => state.count)
+      const setCount = useCountStore((state) => state.setCount)
+      // ...
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Recoil">
+    ```tsx
+    import { atom, useRecoilState, RecoilRoot } from 'recoil'
+    
+    const countAtom = atom({
+      key: 'count',
+      default: 0,
+    })
+    
+    function App() {
+      return (
+        <RecoilRoot>
+          <Component />
+        </RecoilRoot>
+      )
+    }
+    
+    function Component() {
+      const [count, setCount] = useRecoilState(countAtom)
+      // ...
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Migration guides
+
+Switching state management libraries? Here are quick migration tips:
+
+<AccordionGroup>
+  <Accordion title="Migrating from Redux to Zustand">
+    1. Replace action creators with direct `set` calls
+    2. Combine reducers into a single store
+    3. Remove the Provider wrapper
+    4. Replace `useSelector` with store selectors
+    5. Replace `useDispatch` with direct action calls
+    
+    ```tsx
+    // Before (Redux)
+    const count = useSelector(state => state.count)
+    const dispatch = useDispatch()
+    dispatch(increment())
+    
+    // After (Zustand)
+    const count = useStore(state => state.count)
+    const increment = useStore(state => state.increment)
+    increment()
+    ```
+  </Accordion>
+  
+  <Accordion title="Migrating from Context API to Zustand">
+    1. Replace `createContext` with `create`
+    2. Move state and setters into the store
+    3. Remove Provider components
+    4. Replace `useContext` with store selectors
+    
+    ```tsx
+    // Before (Context)
+    const { count, increment } = useContext(CountContext)
+    
+    // After (Zustand)
+    const count = useStore(state => state.count)
+    const increment = useStore(state => state.increment)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Choosing the right tool
+
+<Tip>
+  The best state management solution depends on your specific needs, team preferences, and project constraints. Here's a quick decision guide:
+</Tip>
+
+**Start with Zustand if:**
+- You want minimal boilerplate
+- You're building a new project
+- You value simplicity and small bundle size
+- You don't need atomic state
+
+**Use Redux if:**
+- You have an existing Redux codebase
+- You need time-travel debugging heavily
+- Your team is deeply familiar with Redux
+- You want strict architectural patterns
+
+**Use Context API if:**
+- You have simple, infrequent state updates
+- You want zero dependencies
+- Performance isn't critical
+- You only need theme or auth state
+
+**Try Jotai if:**
+- You like atomic state composition
+- You want automatic derived state
+- You need fine-grained subscriptions
+- You prefer bottom-up architecture
+
+**Try Valtio if:**
+- You prefer mutable updates
+- You want automatic tracking
+- You like Vue or MobX patterns
+- You want minimal syntax
+
+## Further resources
+
+<CardGroup cols={2}>
+  <Card title="npm download trends" icon="chart-line" href="https://npmtrends.com/zustand-vs-redux-vs-jotai-vs-valtio-vs-recoil">
+    Compare popularity and trends
+  </Card>
+  
+  <Card title="Bundle size comparison" icon="box" href="https://bundlephobia.com">
+    Check actual bundle impact
+  </Card>
+</CardGroup>

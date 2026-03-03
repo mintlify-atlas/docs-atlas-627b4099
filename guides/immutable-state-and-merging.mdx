@@ -1,0 +1,179 @@
+---
+title: Immutable State and Merging
+description: Understanding how Zustand handles immutable state updates and merging behavior
+---
+
+Like React's `useState`, Zustand requires state updates to be immutable. Understanding how `set` merges state is crucial for working with Zustand effectively.
+
+## Basic State Updates
+
+Here's a typical example of updating state:
+
+```jsx
+import { create } from 'zustand'
+
+const useCountStore = create((set) => ({
+  count: 0,
+  inc: () => set((state) => ({ count: state.count + 1 })),
+}))
+```
+
+## Automatic Shallow Merging
+
+Because state is immutable, updates should look like this:
+
+```js
+set((state) => ({ ...state, count: state.count + 1 }))
+```
+
+However, `set` automatically performs shallow merging, so you can skip the spread operator:
+
+```js
+set((state) => ({ count: state.count + 1 }))
+```
+
+<Info>
+  The `set` function automatically merges the partial state object with the current state at the top level. You only need to return the properties you want to update.
+</Info>
+
+## Nested Objects
+
+<Warning>
+  The `set` function only merges state at one level deep. For nested objects, you must merge them explicitly using the spread operator.
+</Warning>
+
+When working with nested objects, you need to manually merge nested properties:
+
+```jsx
+import { create } from 'zustand'
+
+const useCountStore = create((set) => ({
+  nested: { count: 0 },
+  inc: () =>
+    set((state) => ({
+      nested: { ...state.nested, count: state.nested.count + 1 },
+    })),
+}))
+```
+
+### Example with Multiple Nesting Levels
+
+```jsx
+import { create } from 'zustand'
+
+const useStore = create((set) => ({
+  user: {
+    profile: {
+      name: 'John',
+      age: 30,
+    },
+    settings: {
+      theme: 'dark',
+    },
+  },
+  updateName: (name) =>
+    set((state) => ({
+      user: {
+        ...state.user,
+        profile: {
+          ...state.user.profile,
+          name,
+        },
+      },
+    })),
+}))
+```
+
+<Tip>
+  For complex nested state updates, consider using libraries that help with immutable updates. See the [Updating State guide](/core/updating-state#deep-state-updates) for more information.
+</Tip>
+
+## The Replace Flag
+
+To disable the automatic merging behavior, specify `true` as the second parameter to `set`:
+
+```js
+set((state) => newState, true)
+```
+
+<Warning>
+  Using the replace flag will completely replace the entire store state. All properties not included in `newState` will be deleted. Use with caution!
+</Warning>
+
+### When to Use Replace
+
+<Tabs>
+  <Tab title="Merging (Default)">
+    ```js
+    const useStore = create((set) => ({
+      count: 0,
+      name: 'John',
+      increment: () => set((state) => ({ count: state.count + 1 })),
+      // Result: { count: 1, name: 'John', increment: [Function] }
+      // The 'name' property is preserved
+    }))
+    ```
+  </Tab>
+  <Tab title="Replacing">
+    ```js
+    const useStore = create((set) => ({
+      count: 0,
+      name: 'John',
+      reset: () => set({ count: 0, name: 'John' }, true),
+      // Result: { count: 0, name: 'John' }
+      // The 'reset' function itself is gone!
+    }))
+    ```
+
+    <Warning>
+      When using replace, make sure to include all necessary properties, including actions!
+    </Warning>
+  </Tab>
+</Tabs>
+
+## Comparison with React's setState
+
+<CodeGroup>
+```jsx React useState
+const [state, setState] = useState({ count: 0, name: 'John' })
+
+// Requires manual spreading
+setState({ ...state, count: state.count + 1 })
+
+// Or use functional update with spreading
+setState((prev) => ({ ...prev, count: prev.count + 1 }))
+```
+
+```jsx Zustand set
+const useStore = create((set) => ({
+  count: 0,
+  name: 'John',
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  // Automatic merging - no spreading needed!
+}))
+```
+</CodeGroup>
+
+## Key Takeaways
+
+<CardGroup cols={2}>
+  <Card title="Shallow Merge" icon="layer-group">
+    `set` automatically merges at the top level—you don't need the spread operator for root properties
+  </Card>
+  <Card title="Nested Objects" icon="folder-tree">
+    Nested objects require manual spreading—automatic merging only works one level deep
+  </Card>
+  <Card title="Replace Flag" icon="rotate">
+    Use `set(newState, true)` to completely replace the store instead of merging
+  </Card>
+  <Card title="Immutability" icon="lock">
+    Always return new objects—never mutate existing state directly
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+For complex use cases with deeply nested objects, check out:
+
+- [Updating State](/core/updating-state) - Learn about helpers for deeply nested updates
+- [Immer Middleware](/integrations/immer-middleware) - Simplify immutable updates with Immer

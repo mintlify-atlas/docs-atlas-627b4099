@@ -1,0 +1,338 @@
+---
+title: SSR and Hydration
+description: Understanding server-side rendering and hydration with React and Zustand
+---
+
+Server-side Rendering (SSR) helps render components into HTML strings on the server, send them to the browser, and "hydrate" the static markup into a fully interactive app on the client.
+
+## What is Server-Side Rendering?
+
+SSR is a technique that:
+
+<Steps>
+  <Step title="Renders on Server">
+    Components are rendered to HTML strings on the server
+  </Step>
+  <Step title="Sends to Browser">
+    HTML is sent directly to the browser for fast initial load
+  </Step>
+  <Step title="Hydrates on Client">
+    The static markup becomes a fully interactive React app
+  </Step>
+</Steps>
+
+## Basic SSR with React
+
+Let's build a simple stateless server-rendered app.
+
+### Required Dependencies
+
+- **express** - Build a web app that runs on Node
+- **react** - Build UI components
+- **react-dom/server** - Render components on the server
+
+<Steps>
+  <Step title="Configure TypeScript">
+    ```json tsconfig.json
+    {
+      "compilerOptions": {
+        "noImplicitAny": false,
+        "noEmitOnError": true,
+        "removeComments": false,
+        "sourceMap": true,
+        "target": "esnext"
+      },
+      "include": ["**/*"]
+    }
+    ```
+
+    <Note>Remove all comments from your `tsconfig.json` file.</Note>
+  </Step>
+
+  <Step title="Create App Component">
+    ```tsx app.tsx
+    export const App = () => {
+      return (
+        <html>
+          <head>
+            <meta charSet="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Static Server-side-rendered App</title>
+          </head>
+          <body>
+            <div>Hello World!</div>
+          </body>
+        </html>
+      )
+    }
+    ```
+  </Step>
+
+  <Step title="Create Server">
+    ```tsx server.tsx
+    import express from 'express'
+    import React from 'react'
+    import ReactDOMServer from 'react-dom/server'
+
+    import { App } from './app.tsx'
+
+    const port = Number.parseInt(process.env.PORT || '3000', 10)
+    const app = express()
+
+    app.get('/', (_, res) => {
+      const { pipe } = ReactDOMServer.renderToPipeableStream(<App />, {
+        onShellReady() {
+          res.setHeader('content-type', 'text/html')
+          pipe(res)
+        },
+      })
+    })
+
+    app.listen(port, () => {
+      console.log(`Server is listening at ${port}`)
+    })
+    ```
+  </Step>
+
+  <Step title="Build and Run">
+    ```sh
+    tsc --build
+    node server.js
+    ```
+  </Step>
+</Steps>
+
+## Hydration
+
+<Warning>
+  Hydration turns the initial HTML snapshot from the server into a fully interactive app. The React tree you pass to `hydrateRoot` **must produce the same output as it did on the server**.
+</Warning>
+
+### Adding Client-Side Interactivity
+
+For stateful apps, you need to hydrate the server-rendered HTML:
+
+- **react-dom/client** - Hydrate components on the client
+
+<Steps>
+  <Step title="Create App Component">
+    ```tsx app.tsx
+    export const App = () => {
+      return (
+        <html>
+          <head>
+            <meta charSet="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Server-side-rendered App with Hydration</title>
+          </head>
+          <body>
+            <div>Hello World!</div>
+          </body>
+        </html>
+      )
+    }
+    ```
+  </Step>
+
+  <Step title="Create Client Entry Point">
+    ```tsx main.tsx
+    import ReactDOMClient from 'react-dom/client'
+
+    import { App } from './app.tsx'
+
+    ReactDOMClient.hydrateRoot(document, <App />)
+    ```
+  </Step>
+
+  <Step title="Update Server">
+    ```tsx server.tsx
+    import express from 'express'
+    import React from 'react'
+    import ReactDOMServer from 'react-dom/server'
+
+    import { App } from './app.tsx'
+
+    const port = Number.parseInt(process.env.PORT || '3000', 10)
+    const app = express()
+
+    app.use('/', (_, res) => {
+      const { pipe } = ReactDOMServer.renderToPipeableStream(<App />, {
+        bootstrapScripts: ['/main.js'],
+        onShellReady() {
+          res.setHeader('content-type', 'text/html')
+          pipe(res)
+        },
+      })
+    })
+
+    app.listen(port, () => {
+      console.log(`Server is listening at ${port}`)
+    })
+    ```
+
+    <Info>
+      The `bootstrapScripts` option tells React to load `main.js` after rendering, which will hydrate the app.
+    </Info>
+  </Step>
+
+  <Step title="Build and Run">
+    ```sh
+    tsc --build
+    node server.js
+    ```
+  </Step>
+</Steps>
+
+## Common Hydration Errors
+
+<Warning>
+  The React tree you pass to `hydrateRoot` needs to produce the **same output** as it did on the server.
+</Warning>
+
+The most common causes of hydration errors:
+
+<AccordionGroup>
+  <Accordion title="Extra Whitespace">
+    Extra whitespace (like newlines) around the React-generated HTML inside the root node.
+
+    ```tsx
+    // Bad - extra whitespace
+    <div>
+      
+      <App />
+      
+    </div>
+
+    // Good
+    <div><App /></div>
+    ```
+  </Accordion>
+
+  <Accordion title="Browser-Only Checks">
+    Using checks like `typeof window !== 'undefined'` in your rendering logic.
+
+    ```tsx
+    // Bad - different output on server and client
+    function Component() {
+      const isBrowser = typeof window !== 'undefined'
+      return <div>{isBrowser ? 'Client' : 'Server'}</div>
+    }
+
+    // Good - use useEffect for client-only code
+    function Component() {
+      const [mounted, setMounted] = useState(false)
+      useEffect(() => setMounted(true), [])
+      return <div>{mounted ? 'Client' : 'Server'}</div>
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Browser-Only APIs">
+    Using browser-only APIs like `window.matchMedia` in your rendering logic.
+
+    ```tsx
+    // Bad - window is not available on server
+    function Component() {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      return <div>{isDark ? 'Dark' : 'Light'}</div>
+    }
+
+    // Good - use useEffect
+    function Component() {
+      const [isDark, setIsDark] = useState(false)
+      useEffect(() => {
+        setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches)
+      }, [])
+      return <div>{isDark ? 'Dark' : 'Light'}</div>
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Different Data">
+    Rendering different data on the server and client.
+
+    ```tsx
+    // Bad - Math.random() gives different values
+    function Component() {
+      return <div>{Math.random()}</div>
+    }
+
+    // Good - use the same data source
+    function Component({ randomValue }) {
+      return <div>{randomValue}</div>
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Hydration with Zustand
+
+When using Zustand with SSR:
+
+<Tabs>
+  <Tab title="Server">
+    Create a store per request to avoid sharing state between users:
+
+    ```tsx
+    import { createStore } from 'zustand/vanilla'
+
+    export const createCounterStore = (initialCount = 0) => {
+      return createStore((set) => ({
+        count: initialCount,
+        inc: () => set((state) => ({ count: state.count + 1 })),
+      }))
+    }
+    ```
+  </Tab>
+
+  <Tab title="Client">
+    Hydrate with the same initial state from the server:
+
+    ```tsx
+    'use client'
+
+    import { useState } from 'react'
+    import { useStore } from 'zustand'
+    import { createCounterStore } from './store'
+
+    export function Counter({ initialCount }) {
+      const [store] = useState(() => createCounterStore(initialCount))
+      const count = useStore(store, (s) => s.count)
+      const inc = useStore(store, (s) => s.inc)
+
+      return (
+        <div>
+          <div>Count: {count}</div>
+          <button onClick={inc}>Increment</button>
+        </div>
+      )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  For detailed Next.js integration patterns, see the [Next.js Guide](/guides/nextjs).
+</Tip>
+
+## Key Takeaways
+
+<CardGroup cols={2}>
+  <Card title="Consistent Output" icon="equals">
+    Server and client must render the same HTML
+  </Card>
+  <Card title="Per-Request Stores" icon="server">
+    Create new stores for each request, don't share globally
+  </Card>
+  <Card title="Hydrate with Same Data" icon="water">
+    Initialize client store with server-rendered state
+  </Card>
+  <Card title="Avoid Browser APIs" icon="browser">
+    Don't use window/document during initial render
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [React hydrateRoot Documentation](https://react.dev/reference/react-dom/client/hydrateRoot)
+- [Next.js with Zustand](/guides/nextjs)

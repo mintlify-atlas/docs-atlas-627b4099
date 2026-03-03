@@ -1,0 +1,500 @@
+---
+title: Testing
+description: Learn how to test Zustand stores and components with Jest and Vitest
+---
+
+This guide covers setting up a testing environment for Zustand, including test runners, UI testing tools, and practical examples.
+
+## Setting Up a Test Environment
+
+### Test Runners
+
+Your test runner needs to be configured to run JavaScript/TypeScript syntax. For UI components, configure the test runner to use JSDOM for a mock DOM environment.
+
+<CardGroup cols={2}>
+  <Card title="Jest" icon="vial" href="https://jestjs.io/docs/getting-started">
+    Industry-standard testing framework with great ecosystem support
+  </Card>
+  <Card title="Vitest" icon="bolt" href="https://vitest.dev/guide">
+    Fast, modern testing framework with ES modules support
+  </Card>
+</CardGroup>
+
+**Configuration Resources:**
+
+- [Jest: Test Environment](https://jestjs.io/docs/configuration#testenvironment-string)
+- [Vitest: Test Environment](https://vitest.dev/config/#environment)
+
+### UI and Network Testing Tools
+
+<Tip>
+  **We recommend using [React Testing Library (RTL)](https://testing-library.com/docs/react-testing-library/intro)** to test React components that connect to Zustand. RTL encourages good testing practices and uses ReactDOM's `render` and `act` utilities.
+</Tip>
+
+**Additional Tools:**
+
+- **[React Testing Library](https://testing-library.com/docs/react-testing-library/setup)** - For DOM testing
+- **[React Native Testing Library](https://testing-library.com/docs/react-native-testing-library/intro)** - For React Native
+- **[User Event Library](https://testing-library.com/docs/user-event/setup)** - For user interactions
+- **[Mock Service Worker (MSW)](https://mswjs.io/)** - For mocking network requests
+
+## Setting Up Zustand for Testing
+
+<Note>
+  Jest uses **CommonJS modules** while Vitest uses **ES modules**. Keep this in mind when setting up your tests.
+</Note>
+
+The mock below enables test runners to reset Zustand stores after each test.
+
+<Tabs>
+  <Tab title="Jest">
+    <Steps>
+      <Step title="Create Zustand Mock">
+        ```ts __mocks__/zustand.ts
+        import { act } from '@testing-library/react'
+        import type * as ZustandExportedTypes from 'zustand'
+        export * from 'zustand'
+
+        const { create: actualCreate, createStore: actualCreateStore } =
+          jest.requireActual<typeof ZustandExportedTypes>('zustand')
+
+        // a variable to hold reset functions for all stores declared in the app
+        export const storeResetFns = new Set<() => void>()
+
+        const createUncurried = <T>(
+          stateCreator: ZustandExportedTypes.StateCreator<T>,
+        ) => {
+          const store = actualCreate(stateCreator)
+          const initialState = store.getInitialState()
+          storeResetFns.add(() => {
+            store.setState(initialState, true)
+          })
+          return store
+        }
+
+        // when creating a store, we get its initial state, create a reset function and add it in the set
+        export const create = (<T>(
+          stateCreator: ZustandExportedTypes.StateCreator<T>,
+        ) => {
+          console.log('zustand create mock')
+
+          // to support curried version of create
+          return typeof stateCreator === 'function'
+            ? createUncurried(stateCreator)
+            : createUncurried
+        }) as typeof ZustandExportedTypes.create
+
+        const createStoreUncurried = <T>(
+          stateCreator: ZustandExportedTypes.StateCreator<T>,
+        ) => {
+          const store = actualCreateStore(stateCreator)
+          const initialState = store.getInitialState()
+          storeResetFns.add(() => {
+            store.setState(initialState, true)
+          })
+          return store
+        }
+
+        // when creating a store, we get its initial state, create a reset function and add it in the set
+        export const createStore = (<T>(
+          stateCreator: ZustandExportedTypes.StateCreator<T>,
+        ) => {
+          console.log('zustand createStore mock')
+
+          // to support curried version of createStore
+          return typeof stateCreator === 'function'
+            ? createStoreUncurried(stateCreator)
+            : createStoreUncurried
+        }) as typeof ZustandExportedTypes.createStore
+
+        // reset all stores after each test run
+        afterEach(() => {
+          act(() => {
+            storeResetFns.forEach((resetFn) => {
+              resetFn()
+            })
+          })
+        })
+        ```
+      </Step>
+
+      <Step title="Setup Test Environment">
+        ```ts setup-jest.ts
+        import '@testing-library/jest-dom'
+        ```
+      </Step>
+
+      <Step title="Configure Jest">
+        ```ts jest.config.ts
+        import type { JestConfigWithTsJest } from 'ts-jest'
+
+        const config: JestConfigWithTsJest = {
+          preset: 'ts-jest',
+          testEnvironment: 'jsdom',
+          setupFilesAfterEnv: ['./setup-jest.ts'],
+        }
+
+        export default config
+        ```
+
+        <Info>To use TypeScript, install `ts-jest` and `ts-node`.</Info>
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Vitest">
+    <Warning>
+      In Vitest, you can change the [root](https://vitest.dev/config/#root). Make sure to create your `__mocks__` directory in the correct location. If you set root to `./src`, create `./src/__mocks__` instead of `./__mocks__`.
+    </Warning>
+
+    <Steps>
+      <Step title="Create Zustand Mock">
+        ```ts __mocks__/zustand.ts
+        import { act } from '@testing-library/react'
+        import type * as ZustandExportedTypes from 'zustand'
+        export * from 'zustand'
+
+        const { create: actualCreate, createStore: actualCreateStore } =
+          await vi.importActual<typeof ZustandExportedTypes>('zustand')
+
+        // a variable to hold reset functions for all stores declared in the app
+        export const storeResetFns = new Set<() => void>()
+
+        const createUncurried = <T>(
+          stateCreator: ZustandExportedTypes.StateCreator<T>,
+        ) => {
+          const store = actualCreate(stateCreator)
+          const initialState = store.getInitialState()
+          storeResetFns.add(() => {
+            store.setState(initialState, true)
+          })
+          return store
+        }
+
+        export const create = (<T>(
+          stateCreator: ZustandExportedTypes.StateCreator<T>,
+        ) => {
+          console.log('zustand create mock')
+          return typeof stateCreator === 'function'
+            ? createUncurried(stateCreator)
+            : createUncurried
+        }) as typeof ZustandExportedTypes.create
+
+        const createStoreUncurried = <T>(
+          stateCreator: ZustandExportedTypes.StateCreator<T>,
+        ) => {
+          const store = actualCreateStore(stateCreator)
+          const initialState = store.getInitialState()
+          storeResetFns.add(() => {
+            store.setState(initialState, true)
+          })
+          return store
+        }
+
+        export const createStore = (<T>(
+          stateCreator: ZustandExportedTypes.StateCreator<T>,
+        ) => {
+          console.log('zustand createStore mock')
+          return typeof stateCreator === 'function'
+            ? createStoreUncurried(stateCreator)
+            : createStoreUncurried
+        }) as typeof ZustandExportedTypes.createStore
+
+        // reset all stores after each test run
+        afterEach(() => {
+          act(() => {
+            storeResetFns.forEach((resetFn) => {
+              resetFn()
+            })
+          })
+        })
+        ```
+
+        <Note>
+          Without [globals configuration](https://vitest.dev/config/#globals), add `import { afterEach, vi } from 'vitest'` at the top.
+        </Note>
+      </Step>
+
+      <Step title="Setup TypeScript Globals">
+        ```ts global.d.ts
+        /// <reference types="vite/client" />
+        /// <reference types="vitest/globals" />
+        ```
+
+        <Note>
+          Without globals configuration, remove the `vitest/globals` reference.
+        </Note>
+      </Step>
+
+      <Step title="Setup Test Environment">
+        ```ts setup-vitest.ts
+        import '@testing-library/jest-dom/vitest'
+
+        vi.mock('zustand') // to make it work like Jest (auto-mocking)
+        ```
+
+        <Note>
+          Without globals, add `import { vi } from 'vitest'` at the top.
+        </Note>
+      </Step>
+
+      <Step title="Configure Vitest">
+        ```ts vitest.config.ts
+        import { defineConfig, mergeConfig } from 'vitest/config'
+        import viteConfig from './vite.config'
+
+        export default defineConfig((configEnv) =>
+          mergeConfig(
+            viteConfig(configEnv),
+            defineConfig({
+              test: {
+                globals: true,
+                environment: 'jsdom',
+                setupFiles: ['./setup-vitest.ts'],
+              },
+            }),
+          ),
+        )
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Testing Components
+
+Let's create a shared counter store for our examples:
+
+```ts shared/counter-store-creator.ts
+import { type StateCreator } from 'zustand'
+
+export type CounterStore = {
+  count: number
+  inc: () => void
+}
+
+export const counterStoreCreator: StateCreator<CounterStore> = (set) => ({
+  count: 1,
+  inc: () => set((state) => ({ count: state.count + 1 })),
+})
+```
+
+<Tabs>
+  <Tab title="Without Context">
+    <Steps>
+      <Step title="Create Store">
+        ```ts stores/use-counter-store.ts
+        import { create } from 'zustand'
+        import { type CounterStore, counterStoreCreator } from '../shared/counter-store-creator'
+
+        export const useCounterStore = create<CounterStore>()(counterStoreCreator)
+        ```
+      </Step>
+
+      <Step title="Create Component">
+        ```tsx components/counter/counter.tsx
+        import { useCounterStore } from '../../stores/use-counter-store'
+
+        export function Counter() {
+          const { count, inc } = useCounterStore()
+
+          return (
+            <div>
+              <h2>Counter Store</h2>
+              <h4>{count}</h4>
+              <button onClick={inc}>One Up</button>
+            </div>
+          )
+        }
+        ```
+      </Step>
+
+      <Step title="Write Tests">
+        ```tsx components/counter/counter.test.tsx
+        import { render, screen } from '@testing-library/react'
+        import userEvent from '@testing-library/user-event'
+        import { Counter } from './counter'
+
+        describe('Counter', () => {
+          test('should render with initial state of 1', async () => {
+            render(<Counter />)
+
+            expect(await screen.findByText(/^1$/)).toBeInTheDocument()
+            expect(
+              await screen.findByRole('button', { name: /one up/i }),
+            ).toBeInTheDocument()
+          })
+
+          test('should increase count by clicking a button', async () => {
+            const user = userEvent.setup()
+            render(<Counter />)
+
+            expect(await screen.findByText(/^1$/)).toBeInTheDocument()
+
+            await user.click(await screen.findByRole('button', { name: /one up/i }))
+
+            expect(await screen.findByText(/^2$/)).toBeInTheDocument()
+          })
+        })
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="With Context">
+    <Steps>
+      <Step title="Create Context Provider">
+        ```tsx contexts/use-counter-store-context.tsx
+        import { type ReactNode, createContext, useContext, useState } from 'react'
+        import { createStore } from 'zustand'
+        import { useStoreWithEqualityFn } from 'zustand/traditional'
+        import { shallow } from 'zustand/shallow'
+        import { type CounterStore, counterStoreCreator } from '../shared/counter-store-creator'
+
+        export const createCounterStore = () => {
+          return createStore<CounterStore>(counterStoreCreator)
+        }
+
+        export type CounterStoreApi = ReturnType<typeof createCounterStore>
+
+        export const CounterStoreContext = createContext<CounterStoreApi | undefined>(
+          undefined,
+        )
+
+        export interface CounterStoreProviderProps {
+          children: ReactNode
+        }
+
+        export const CounterStoreProvider = ({
+          children,
+        }: CounterStoreProviderProps) => {
+          const [store] = useState(() => createCounterStore())
+          return (
+            <CounterStoreContext.Provider value={store}>
+              {children}
+            </CounterStoreContext.Provider>
+          )
+        }
+
+        export const useCounterStoreContext = <T,>(
+          selector: (store: CounterStore) => T,
+        ): T => {
+          const counterStoreContext = useContext(CounterStoreContext)
+
+          if (counterStoreContext === undefined) {
+            throw new Error(
+              'useCounterStoreContext must be used within CounterStoreProvider',
+            )
+          }
+
+          return useStoreWithEqualityFn(counterStoreContext, selector, shallow)
+        }
+        ```
+      </Step>
+
+      <Step title="Create Component">
+        ```tsx components/counter-with-context/counter-with-context.tsx
+        import { CounterStoreProvider, useCounterStoreContext } from '../../contexts/use-counter-store-context'
+
+        const Counter = () => {
+          const { count, inc } = useCounterStoreContext((state) => state)
+
+          return (
+            <div>
+              <h2>Counter Store Context</h2>
+              <h4>{count}</h4>
+              <button onClick={inc}>One Up</button>
+            </div>
+          )
+        }
+
+        export const CounterWithContext = () => {
+          return (
+            <CounterStoreProvider>
+              <Counter />
+            </CounterStoreProvider>
+          )
+        }
+        ```
+      </Step>
+
+      <Step title="Write Tests">
+        ```tsx components/counter-with-context/counter-with-context.test.tsx
+        import { render, screen } from '@testing-library/react'
+        import userEvent from '@testing-library/user-event'
+        import { CounterWithContext } from './counter-with-context'
+
+        describe('CounterWithContext', () => {
+          test('should render with initial state of 1', async () => {
+            render(<CounterWithContext />)
+
+            expect(await screen.findByText(/^1$/)).toBeInTheDocument()
+            expect(
+              await screen.findByRole('button', { name: /one up/i }),
+            ).toBeInTheDocument()
+          })
+
+          test('should increase count by clicking a button', async () => {
+            const user = userEvent.setup()
+            render(<CounterWithContext />)
+
+            expect(await screen.findByText(/^1$/)).toBeInTheDocument()
+
+            await user.click(await screen.findByRole('button', { name: /one up/i }))
+
+            expect(await screen.findByText(/^2$/)).toBeInTheDocument()
+          })
+        })
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+<Note>
+  Without [globals configuration](https://vitest.dev/config/#globals) in Vitest, add `import { describe, test, expect } from 'vitest'` at the top of each test file.
+</Note>
+
+## Testing Stores Directly
+
+You can also test stores directly using `getState()` instead of rendering components:
+
+```tsx
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Counter, useCounterStore } from '../../../stores/use-counter-store.ts'
+
+describe('Counter Store', () => {
+  test('should have initial state of 1', () => {
+    expect(useCounterStore.getState().count).toBe(1)
+  })
+
+  test('should increase count', async () => {
+    const user = userEvent.setup()
+    render(<Counter />)
+
+    expect(useCounterStore.getState().count).toBe(1)
+
+    await user.click(await screen.findByRole('button', { name: /one up/i }))
+
+    expect(useCounterStore.getState().count).toBe(2)
+  })
+})
+```
+
+## References
+
+- **[React Testing Library](https://testing-library.com/docs/react-testing-library/intro)** - "The more your tests resemble the way your software is used, the more confidence they can give you."
+- **[Native Testing Library](https://testing-library.com/docs/react-native-testing-library/intro)** - Testing React Native components
+- **[Testing Implementation Details](https://kentcdodds.com/blog/testing-implementation-details)** - Why to avoid testing implementation details
+
+## Live Demos
+
+<CardGroup cols={2}>
+  <Card title="Jest Demo" icon="vial" href="https://stackblitz.com/edit/jest-zustand">
+    Complete working example with Jest
+  </Card>
+  <Card title="Vitest Demo" icon="bolt" href="https://stackblitz.com/edit/vitest-zustand">
+    Complete working example with Vitest
+  </Card>
+</CardGroup>

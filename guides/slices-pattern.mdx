@@ -1,0 +1,242 @@
+---
+title: Slices Pattern
+description: Split large stores into smaller, modular slices for better maintainability
+---
+
+As your application grows, your Zustand store can become large and difficult to maintain. The slices pattern helps you divide your store into smaller, modular pieces.
+
+## Why Use Slices?
+
+<CardGroup cols={2}>
+  <Card title="Modularity" icon="puzzle-piece">
+    Keep related state and actions together in isolated slices
+  </Card>
+  <Card title="Maintainability" icon="screwdriver-wrench">
+    Easier to understand and modify individual features
+  </Card>
+  <Card title="Reusability" icon="recycle">
+    Share slices across multiple stores
+  </Card>
+  <Card title="Organization" icon="folder-tree">
+    Clear separation of concerns for large applications
+  </Card>
+</CardGroup>
+
+## Creating Individual Slices
+
+Each slice is a function that returns a partial state and actions:
+
+<Steps>
+  <Step title="Create the Fish Slice">
+    ```js fishSlice.js
+    export const createFishSlice = (set) => ({
+      fishes: 0,
+      addFish: () => set((state) => ({ fishes: state.fishes + 1 })),
+    })
+    ```
+  </Step>
+
+  <Step title="Create the Bear Slice">
+    ```js bearSlice.js
+    export const createBearSlice = (set) => ({
+      bears: 0,
+      addBear: () => set((state) => ({ bears: state.bears + 1 })),
+      eatFish: () => set((state) => ({ fishes: state.fishes - 1 })),
+    })
+    ```
+
+    <Note>
+      Notice that `eatFish` updates the `fishes` property from another slice. Slices can interact with each other!
+    </Note>
+  </Step>
+
+  <Step title="Combine into a Bounded Store">
+    ```js useBoundStore.js
+    import { create } from 'zustand'
+    import { createBearSlice } from './bearSlice'
+    import { createFishSlice } from './fishSlice'
+
+    export const useBoundStore = create((...a) => ({
+      ...createBearSlice(...a),
+      ...createFishSlice(...a),
+    }))
+    ```
+
+    <Info>
+      The `...a` syntax passes all arguments (`set`, `get`, `api`) to each slice creator.
+    </Info>
+  </Step>
+</Steps>
+
+## Using Slices in Components
+
+```jsx
+import { useBoundStore } from './stores/useBoundStore'
+
+function App() {
+  const bears = useBoundStore((state) => state.bears)
+  const fishes = useBoundStore((state) => state.fishes)
+  const addBear = useBoundStore((state) => state.addBear)
+  
+  return (
+    <div>
+      <h2>Number of bears: {bears}</h2>
+      <h2>Number of fishes: {fishes}</h2>
+      <button onClick={() => addBear()}>Add a bear</button>
+    </div>
+  )
+}
+
+export default App
+```
+
+## Cross-Slice Updates
+
+Slices can update multiple parts of the store using `get()` to access other slices:
+
+```js createBearFishSlice.js
+export const createBearFishSlice = (set, get) => ({
+  addBearAndFish: () => {
+    get().addBear()
+    get().addFish()
+  },
+})
+```
+
+Combine it with other slices:
+
+```js useBoundStore.js
+import { create } from 'zustand'
+import { createBearSlice } from './bearSlice'
+import { createFishSlice } from './fishSlice'
+import { createBearFishSlice } from './createBearFishSlice'
+
+export const useBoundStore = create((...a) => ({
+  ...createBearSlice(...a),
+  ...createFishSlice(...a),
+  ...createBearFishSlice(...a),
+}))
+```
+
+<Tip>
+  Use `get()` to access the current state and call actions from other slices. This is useful for coordinating updates across multiple slices.
+</Tip>
+
+## Adding Middlewares
+
+<Warning>
+  Apply middlewares only to the combined store, not to individual slices. Applying middlewares to slices can lead to unexpected issues.
+</Warning>
+
+Example with the `persist` middleware:
+
+```js useBoundStore.js
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import { createBearSlice } from './bearSlice'
+import { createFishSlice } from './fishSlice'
+
+export const useBoundStore = create(
+  persist(
+    (...a) => ({
+      ...createBearSlice(...a),
+      ...createFishSlice(...a),
+    }),
+    { name: 'bound-store' },
+  ),
+)
+```
+
+## TypeScript Support
+
+For TypeScript users, the slices pattern requires proper type annotations:
+
+```ts
+import { create, StateCreator } from 'zustand'
+
+interface BearSlice {
+  bears: number
+  addBear: () => void
+  eatFish: () => void
+}
+
+interface FishSlice {
+  fishes: number
+  addFish: () => void
+}
+
+const createBearSlice: StateCreator<
+  BearSlice & FishSlice,
+  [],
+  [],
+  BearSlice
+> = (set) => ({
+  bears: 0,
+  addBear: () => set((state) => ({ bears: state.bears + 1 })),
+  eatFish: () => set((state) => ({ fishes: state.fishes - 1 })),
+})
+
+const createFishSlice: StateCreator<
+  BearSlice & FishSlice,
+  [],
+  [],
+  FishSlice
+> = (set) => ({
+  fishes: 0,
+  addFish: () => set((state) => ({ fishes: state.fishes + 1 })),
+})
+
+const useBoundStore = create<BearSlice & FishSlice>()((...a) => ({
+  ...createBearSlice(...a),
+  ...createFishSlice(...a),
+}))
+```
+
+<Info>
+  A detailed TypeScript guide for the slices pattern is available in the [TypeScript Guide](/guides/typescript).
+</Info>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Organize by Feature">
+    Group related state and actions together in the same slice. For example, put all user-related state in a `userSlice`, all cart-related state in a `cartSlice`, etc.
+  </Accordion>
+
+  <Accordion title="Keep Slices Focused">
+    Each slice should have a single responsibility. If a slice becomes too large, consider splitting it further.
+  </Accordion>
+
+  <Accordion title="Use Descriptive Names">
+    Name slices based on what they manage: `createAuthSlice`, `createCartSlice`, `createUserSlice`, etc.
+  </Accordion>
+
+  <Accordion title="Avoid Circular Dependencies">
+    Be careful when slices reference each other. If slice A needs data from slice B, use `get()` to access it, but avoid creating circular update loops.
+  </Accordion>
+</AccordionGroup>
+
+## File Structure Example
+
+```
+src/
+├── stores/
+│   ├── slices/
+│   │   ├── bearSlice.js
+│   │   ├── fishSlice.js
+│   │   └── userSlice.js
+│   └── useBoundStore.js
+└── components/
+    └── App.jsx
+```
+
+## Related Guides
+
+<CardGroup cols={2}>
+  <Card title="TypeScript Guide" icon="code" href="/guides/typescript">
+    Learn advanced TypeScript patterns for slices
+  </Card>
+  <Card title="Persist Middleware" icon="database" href="/integrations/persisting-store-data">
+    Persist your sliced store to localStorage
+  </Card>
+</CardGroup>

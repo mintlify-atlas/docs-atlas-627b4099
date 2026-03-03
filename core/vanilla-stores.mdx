@@ -1,0 +1,487 @@
+---
+title: Vanilla Stores
+description: Learn how to use Zustand without React
+---
+
+Zustand's core is framework-agnostic. You can use vanilla stores in any JavaScript environment, including Node.js, vanilla JavaScript apps, or with other frameworks.
+
+## Creating Vanilla Stores
+
+Use `createStore` from `zustand/vanilla` to create stores without React:
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+
+type CounterState = {
+  count: number
+  increment: () => void
+  decrement: () => void
+}
+
+const counterStore = createStore<CounterState>()((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  decrement: () => set((state) => ({ count: state.count - 1 })),
+}))
+```
+
+<Info>
+Vanilla stores have the exact same API as React stores, but without the hook wrapper.
+</Info>
+
+## The StoreApi Interface
+
+Vanilla stores expose the `StoreApi` interface:
+
+```typescript
+interface StoreApi<T> {
+  setState: SetStateInternal<T>
+  getState: () => T
+  getInitialState: () => T
+  subscribe: (listener: (state: T, prevState: T) => void) => () => void
+}
+```
+
+### getState()
+
+Read the current state:
+
+```typescript
+const counterStore = createStore<{ count: number }>()(() => ({ count: 0 }))
+
+// Read state
+const currentCount = counterStore.getState().count
+console.log(currentCount) // 0
+```
+
+### setState()
+
+Update the state:
+
+<CodeGroup>
+```typescript Partial Update
+counterStore.setState({ count: 5 })
+```
+
+```typescript Function Update
+counterStore.setState((state) => ({ count: state.count + 1 }))
+```
+
+```typescript Replace Mode
+counterStore.setState({ count: 0 }, true)
+```
+</CodeGroup>
+
+### subscribe()
+
+Listen to state changes:
+
+```typescript
+const unsubscribe = counterStore.subscribe((state, prevState) => {
+  console.log('Count changed from', prevState.count, 'to', state.count)
+})
+
+// Later: stop listening
+unsubscribe()
+```
+
+<Warning>
+Always call the unsubscribe function to prevent memory leaks.
+</Warning>
+
+### getInitialState()
+
+Get the initial state that the store was created with:
+
+```typescript
+const initial = counterStore.getInitialState()
+console.log(initial.count) // 0
+
+counterStore.setState({ count: 5 })
+console.log(counterStore.getState().count) // 5
+console.log(counterStore.getInitialState().count) // Still 0
+```
+
+## Using Vanilla Stores in React
+
+You can use vanilla stores in React with the `useStore` hook:
+
+<Steps>
+  <Step title="Create a vanilla store">
+    ```typescript
+    import { createStore } from 'zustand/vanilla'
+
+    type CounterStore = {
+      count: number
+      increment: () => void
+    }
+
+    export const counterStore = createStore<CounterStore>()((set) => ({
+      count: 0,
+      increment: () => set((state) => ({ count: state.count + 1 })),
+    }))
+    ```
+  </Step>
+
+  <Step title="Use it in React components">
+    ```tsx
+    import { useStore } from 'zustand'
+    import { counterStore } from './store'
+
+    function Counter() {
+      const count = useStore(counterStore, (state) => state.count)
+      const increment = useStore(counterStore, (state) => state.increment)
+
+      return (
+        <div>
+          <p>Count: {count}</p>
+          <button onClick={increment}>Increment</button>
+        </div>
+      )
+    }
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+This pattern is useful for sharing state between React and non-React parts of your application.
+</Tip>
+
+## Vanilla Store Examples
+
+### Browser Integration
+
+Update the DOM directly:
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+
+type PositionStore = {
+  x: number
+  y: number
+  setPosition: (x: number, y: number) => void
+}
+
+const positionStore = createStore<PositionStore>()((set) => ({
+  x: 0,
+  y: 0,
+  setPosition: (x, y) => set({ x, y }),
+}))
+
+// DOM elements
+const $dotContainer = document.getElementById('dot-container') as HTMLDivElement
+const $dot = document.getElementById('dot') as HTMLDivElement
+
+// Update DOM on pointer move
+$dotContainer.addEventListener('pointermove', (event) => {
+  positionStore.getState().setPosition(event.clientX, event.clientY)
+})
+
+// Subscribe to state changes and render
+const render = (state: PositionStore) => {
+  $dot.style.transform = `translate(${state.x}px, ${state.y}px)`
+}
+
+// Initial render
+render(positionStore.getInitialState())
+
+// Subscribe to updates
+positionStore.subscribe(render)
+```
+
+### Node.js Integration
+
+Use in server-side code:
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+
+type ServerStore = {
+  activeConnections: number
+  incrementConnections: () => void
+  decrementConnections: () => void
+}
+
+const serverStore = createStore<ServerStore>()((set) => ({
+  activeConnections: 0,
+  incrementConnections: () =>
+    set((state) => ({ activeConnections: state.activeConnections + 1 })),
+  decrementConnections: () =>
+    set((state) => ({ activeConnections: state.activeConnections - 1 })),
+}))
+
+// Log on state changes
+serverStore.subscribe((state) => {
+  console.log('Active connections:', state.activeConnections)
+})
+
+// Use in server handlers
+app.on('connection', () => {
+  serverStore.getState().incrementConnections()
+})
+
+app.on('disconnect', () => {
+  serverStore.getState().decrementConnections()
+})
+```
+
+### With Web Workers
+
+Share state between main thread and workers:
+
+<Tabs>
+  <Tab title="Main Thread">
+    ```typescript
+    import { createStore } from 'zustand/vanilla'
+
+    type WorkerStore = {
+      result: number | null
+      compute: (data: number[]) => void
+    }
+
+    const workerStore = createStore<WorkerStore>()((set) => ({
+      result: null,
+      compute: (data) => {
+        const worker = new Worker('worker.js')
+        
+        worker.postMessage(data)
+        
+        worker.onmessage = (event) => {
+          set({ result: event.data })
+          worker.terminate()
+        }
+      },
+    }))
+
+    // Subscribe to results
+    workerStore.subscribe((state) => {
+      if (state.result !== null) {
+        console.log('Computation result:', state.result)
+      }
+    })
+
+    // Start computation
+    workerStore.getState().compute([1, 2, 3, 4, 5])
+    ```
+  </Tab>
+
+  <Tab title="Worker">
+    ```typescript
+    // worker.js
+    self.onmessage = (event) => {
+      const data = event.data
+      const result = data.reduce((sum, num) => sum + num, 0)
+      self.postMessage(result)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Scoped Vanilla Stores
+
+Create stores dynamically for scoped state:
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+
+type TabStore = {
+  active: boolean
+  content: string
+  activate: () => void
+  deactivate: () => void
+}
+
+function createTabStore(content: string) {
+  return createStore<TabStore>()((set) => ({
+    active: false,
+    content,
+    activate: () => set({ active: true }),
+    deactivate: () => set({ active: false }),
+  }))
+}
+
+// Create multiple tab stores
+const tab1 = createTabStore('Tab 1 content')
+const tab2 = createTabStore('Tab 2 content')
+const tab3 = createTabStore('Tab 3 content')
+
+// Each has independent state
+tab1.getState().activate()
+console.log(tab1.getState().active) // true
+console.log(tab2.getState().active) // false
+```
+
+## Combining with React Context
+
+Use vanilla stores with React Context for scoped state:
+
+```tsx
+import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createStore, useStore } from 'zustand'
+
+type CounterStore = {
+  count: number
+  increment: () => void
+}
+
+const createCounterStore = () => {
+  return createStore<CounterStore>()((set) => ({
+    count: 0,
+    increment: () => set((state) => ({ count: state.count + 1 })),
+  }))
+}
+
+const CounterContext = createContext<ReturnType<typeof createCounterStore> | null>(
+  null
+)
+
+export function CounterProvider({ children }: { children: ReactNode }) {
+  const [store] = useState(createCounterStore)
+  return (
+    <CounterContext.Provider value={store}>
+      {children}
+    </CounterContext.Provider>
+  )
+}
+
+export function useCounter<T>(selector: (state: CounterStore) => T): T {
+  const store = useContext(CounterContext)
+  if (!store) throw new Error('Missing CounterProvider')
+  return useStore(store, selector)
+}
+
+// Usage
+function Counter() {
+  const count = useCounter((state) => state.count)
+  const increment = useCounter((state) => state.increment)
+  
+  return <button onClick={increment}>{count}</button>
+}
+
+function App() {
+  return (
+    <div>
+      <CounterProvider>
+        <Counter />
+      </CounterProvider>
+      <CounterProvider>
+        <Counter />
+      </CounterProvider>
+    </div>
+  )
+}
+```
+
+<Info>
+Each `CounterProvider` creates an independent store instance, allowing for truly isolated state.
+</Info>
+
+## Subscribing to Specific Changes
+
+The subscribe function receives both current and previous state:
+
+```typescript
+type Store = {
+  count: number
+  name: string
+}
+
+const store = createStore<Store>()(() => ({
+  count: 0,
+  name: 'Initial',
+}))
+
+store.subscribe((state, prevState) => {
+  if (state.count !== prevState.count) {
+    console.log('Count changed:', prevState.count, '->', state.count)
+  }
+  
+  if (state.name !== prevState.name) {
+    console.log('Name changed:', prevState.name, '->', state.name)
+  }
+})
+
+store.setState({ count: 1 }) // Logs: "Count changed: 0 -> 1"
+store.setState({ name: 'Updated' }) // Logs: "Name changed: Initial -> Updated"
+```
+
+## TypeScript Support
+
+Vanilla stores have full TypeScript support:
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+import type { StoreApi } from 'zustand/vanilla'
+
+type State = {
+  count: number
+  text: string
+}
+
+type Actions = {
+  increment: () => void
+  setText: (text: string) => void
+  reset: () => void
+}
+
+type Store = State & Actions
+
+// Strongly typed store
+const store: StoreApi<Store> = createStore<Store>()((set, get) => ({
+  count: 0,
+  text: '',
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  setText: (text) => set({ text }),
+  reset: () => set({ count: 0, text: '' }),
+}))
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="1. Always unsubscribe">
+    Store the unsubscribe function and call it when done:
+
+    ```typescript
+    const unsubscribe = store.subscribe(listener)
+    // Later...
+    unsubscribe()
+    ```
+  </Accordion>
+
+  <Accordion title="2. Use getState for one-time reads">
+    Don't subscribe if you only need the current value:
+
+    ```typescript
+    const currentValue = store.getState().count
+    ```
+  </Accordion>
+
+  <Accordion title="3. Call actions through getState">
+    ```typescript
+    store.getState().increment()
+    // Not: store.increment()
+    ```
+  </Accordion>
+
+  <Accordion title="4. Export stores as singletons">
+    ```typescript
+    // store.ts
+    export const appStore = createStore(...)  // Singleton
+
+    // Or export factory for multiple instances
+    export const createAppStore = () => createStore(...)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Middlewares" icon="layer-group" href="/middlewares/immer">
+    Enhance stores with middleware
+  </Card>
+  <Card title="Testing" icon="flask" href="/guides/testing">
+    Learn how to test vanilla stores
+  </Card>
+</CardGroup>

@@ -1,0 +1,125 @@
+---
+title: 'useStore'
+description: 'React Hook for using vanilla stores in React components'
+---
+
+`useStore` is a React Hook that lets you use a vanilla store in React.
+
+## Import
+
+```tsx
+import { useStore } from 'zustand'
+```
+
+## Signature
+
+```tsx
+function useStore<S extends ReadonlyStoreApi<unknown>>(
+  api: S
+): ExtractState<S>
+
+function useStore<S extends ReadonlyStoreApi<unknown>, U>(
+  api: S,
+  selector: (state: ExtractState<S>) => U
+): U
+```
+
+## Parameters
+
+<ParamField path="api" type="StoreApi<T>" required>
+  The vanilla store instance created with `createStore`
+</ParamField>
+
+<ParamField path="selector" type="(state: T) => U">
+  Optional function that selects a portion of the state. If omitted, returns the entire state.
+</ParamField>
+
+## Returns
+
+<ResponseField name="state" type="T | U">
+  Returns the selected state. The component will re-render when the selected state changes.
+</ResponseField>
+
+## Usage
+
+### Basic usage with vanilla store
+
+```tsx
+import { createStore, useStore } from 'zustand'
+
+type PositionStore = {
+  position: { x: number; y: number }
+  setPosition: (pos: { x: number; y: number }) => void
+}
+
+const positionStore = createStore<PositionStore>()((set) => ({
+  position: { x: 0, y: 0 },
+  setPosition: (position) => set({ position }),
+}))
+
+function MovingDot() {
+  const position = useStore(positionStore, (state) => state.position)
+  const setPosition = useStore(positionStore, (state) => state.setPosition)
+
+  return (
+    <div
+      onPointerMove={(e) => {
+        setPosition({ x: e.clientX, y: e.clientY })
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          backgroundColor: 'red',
+          borderRadius: '50%',
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          width: 20,
+          height: 20,
+        }}
+      />
+    </div>
+  )
+}
+```
+
+### Using with React Context
+
+For scoped (non-global) stores, use with React Context:
+
+```tsx
+import { createContext, useContext, useState } from 'react'
+import { createStore, useStore } from 'zustand'
+
+const StoreContext = createContext(null)
+
+function StoreProvider({ children }) {
+  const [store] = useState(() => createStore((set) => ({
+    count: 0,
+    increment: () => set((state) => ({ count: state.count + 1 })),
+  })))
+  
+  return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
+}
+
+function useCounterStore(selector) {
+  const store = useContext(StoreContext)
+  if (!store) throw new Error('Missing StoreProvider')
+  return useStore(store, selector)
+}
+```
+
+### Selecting without a selector
+
+Omit the selector to get the entire state:
+
+```tsx
+const state = useStore(store)
+// state has type: { position: { x: number; y: number }, setPosition: ... }
+```
+
+## Notes
+
+- The component re-renders when the selected state changes
+- Uses `Object.is` for equality comparison by default
+- For custom equality functions, use `useStoreWithEqualityFn`
+- Selector function should be stable or memoized for optimal performance

@@ -1,0 +1,294 @@
+---
+title: combine
+description: Automatically infer types by combining initial state with actions
+---
+
+The `combine` middleware simplifies store creation by automatically inferring types from your initial state and actions. This eliminates the need for explicit type definitions and makes the curried version of `create` unnecessary when using middleware.
+
+```typescript
+import { combine } from 'zustand/middleware'
+
+const useStore = create(
+  combine(
+    { count: 0 }, // Initial state
+    (set) => ({ // Actions
+      increment: () => set((state) => ({ count: state.count + 1 })),
+    })
+  )
+)
+```
+
+## Signature
+
+```typescript
+combine<T, U>(
+  initialState: T,
+  additionalStateCreator: StateCreator<T, [], [], U>
+): StateCreator<Omit<T, keyof U> & U, [], []>
+```
+
+## Parameters
+
+<ParamField path="initialState" type="T" required>
+  The initial state object. Can be any type except a function.
+</ParamField>
+
+<ParamField path="additionalStateCreator" type="StateCreator<T, [], [], U>" required>
+  A function that takes `set`, `get`, and `store` as arguments, returning an object with actions and computed values.
+</ParamField>
+
+## Basic Usage
+
+No explicit types needed - they're inferred automatically:
+
+```typescript
+import { create } from 'zustand'
+import { combine } from 'zustand/middleware'
+
+const useCounterStore = create(
+  combine(
+    { count: 0 },
+    (set) => ({
+      increment: () => set((state) => ({ count: state.count + 1 })),
+      decrement: () => set((state) => ({ count: state.count - 1 })),
+      reset: () => set({ count: 0 }),
+    })
+  )
+)
+
+// TypeScript knows the exact shape
+function Counter() {
+  const count = useCounterStore((state) => state.count) // number
+  const increment = useCounterStore((state) => state.increment) // () => void
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={increment}>Increment</button>
+    </div>
+  )
+}
+```
+
+## Without Combine
+
+Traditional approach requires explicit types:
+
+```typescript
+import { create } from 'zustand'
+
+type Store = {
+  count: number
+  increment: () => void
+  decrement: () => void
+}
+
+const useStore = create<Store>()((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  decrement: () => set((state) => ({ count: state.count - 1 })),
+}))
+```
+
+## With Combine
+
+Types are automatically inferred:
+
+```typescript
+import { create } from 'zustand'
+import { combine } from 'zustand/middleware'
+
+const useStore = create(
+  combine(
+    { count: 0 },
+    (set) => ({
+      increment: () => set((state) => ({ count: state.count + 1 })),
+      decrement: () => set((state) => ({ count: state.count - 1 })),
+    })
+  )
+)
+
+// All types are inferred, no manual type definitions needed!
+```
+
+## Complex State
+
+```typescript
+const useUserStore = create(
+  combine(
+    {
+      user: null as { name: string; email: string } | null,
+      loading: false,
+      error: null as string | null,
+    },
+    (set) => ({
+      setUser: (user: { name: string; email: string }) =>
+        set({ user, loading: false, error: null }),
+      setLoading: (loading: boolean) => set({ loading }),
+      setError: (error: string) => set({ error, loading: false }),
+      logout: () => set({ user: null, error: null }),
+    })
+  )
+)
+```
+
+## Using get for Derived Logic
+
+```typescript
+const useCartStore = create(
+  combine(
+    {
+      items: [] as Array<{ id: string; price: number; quantity: number }>,
+    },
+    (set, get) => ({
+      addItem: (item: { id: string; price: number; quantity: number }) =>
+        set({ items: [...get().items, item] }),
+      removeItem: (id: string) =>
+        set({ items: get().items.filter((item) => item.id !== id) }),
+      getTotal: () =>
+        get().items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      clear: () => set({ items: [] }),
+    })
+  )
+)
+```
+
+## Vanilla Store
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+import { combine } from 'zustand/middleware'
+
+const positionStore = createStore(
+  combine(
+    { position: { x: 0, y: 0 } },
+    (set) => ({
+      setPosition: (position: { x: number; y: number }) => set({ position }),
+    })
+  )
+)
+
+const dotContainer = document.getElementById('dot-container') as HTMLDivElement
+const dot = document.getElementById('dot') as HTMLDivElement
+
+dotContainer.addEventListener('pointermove', (event) => {
+  positionStore.getState().setPosition({
+    x: event.clientX,
+    y: event.clientY,
+  })
+})
+
+const render = (state: ReturnType<typeof positionStore.getState>) => {
+  dot.style.transform = `translate(${state.position.x}px, ${state.position.y}px)`
+}
+
+render(positionStore.getInitialState())
+positionStore.subscribe(render)
+```
+
+## Composing with Middleware
+
+```typescript
+import { devtools, persist } from 'zustand/middleware'
+import { combine } from 'zustand/middleware'
+
+const useStore = create(
+  devtools(
+    persist(
+      combine(
+        { count: 0 },
+        (set) => ({
+          increment: () =>
+            set((state) => ({ count: state.count + 1 }), undefined, 'increment'),
+          decrement: () =>
+            set((state) => ({ count: state.count - 1 }), undefined, 'decrement'),
+        })
+      ),
+      { name: 'counter-storage' }
+    ),
+    { name: 'CounterStore' }
+  )
+)
+```
+
+## Multiple State Slices
+
+```typescript
+const useStore = create(
+  combine(
+    {
+      user: { name: 'John', email: 'john@example.com' },
+      settings: { theme: 'light' as const, notifications: true },
+      ui: { sidebarOpen: false, modalOpen: false },
+    },
+    (set) => ({
+      updateUser: (updates: Partial<{ name: string; email: string }>) =>
+        set((state) => ({ user: { ...state.user, ...updates } })),
+      updateSettings: (updates: Partial<{ theme: 'light' | 'dark'; notifications: boolean }>) =>
+        set((state) => ({ settings: { ...state.settings, ...updates } })),
+      toggleSidebar: () =>
+        set((state) => ({ ui: { ...state.ui, sidebarOpen: !state.ui.sidebarOpen } })),
+      openModal: () =>
+        set((state) => ({ ui: { ...state.ui, modalOpen: true } })),
+      closeModal: () =>
+        set((state) => ({ ui: { ...state.ui, modalOpen: false } })),
+    })
+  )
+)
+```
+
+## Async Actions
+
+```typescript
+const useDataStore = create(
+  combine(
+    {
+      data: null as string[] | null,
+      loading: false,
+      error: null as string | null,
+    },
+    (set) => ({
+      fetchData: async () => {
+        set({ loading: true, error: null })
+        try {
+          const response = await fetch('/api/data')
+          const data = await response.json()
+          set({ data, loading: false })
+        } catch (error) {
+          set({ error: error.message, loading: false })
+        }
+      },
+    })
+  )
+)
+```
+
+## Benefits
+
+<CardGroup cols={2}>
+  <Card title="Type Inference" icon="wand-magic-sparkles">
+    Automatically infers types from initial state and actions, reducing boilerplate.
+  </Card>
+  <Card title="Simpler Syntax" icon="code">
+    No need for curried `create()()` syntax when using middleware.
+  </Card>
+  <Card title="Better DX" icon="heart">
+    Autocomplete works perfectly without manual type definitions.
+  </Card>
+  <Card title="Less Errors" icon="shield-check">
+    Reduced chance of type mismatches between state and actions.
+  </Card>
+</CardGroup>
+
+## When to Use
+
+Use `combine` when:
+- You want automatic type inference
+- You're using middleware and want cleaner syntax
+- Your state structure is straightforward
+- You prefer separating state from actions
+
+Avoid `combine` when:
+- You need complex type transformations
+- You have circular type dependencies
+- You prefer all state and actions together

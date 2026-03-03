@@ -1,0 +1,283 @@
+---
+title: persist
+description: Persist store state across page reloads and sessions
+---
+
+The `persist` middleware enables automatic state persistence to storage (localStorage, sessionStorage, or custom storage implementations). This ensures your store's state survives page reloads and browser sessions.
+
+```typescript
+import { persist, createJSONStorage } from 'zustand/middleware'
+
+const useStore = create(
+  persist(
+    (set) => ({
+      count: 0,
+      increment: () => set((state) => ({ count: state.count + 1 })),
+    }),
+    { name: 'counter-storage' }
+  )
+)
+```
+
+## Signature
+
+```typescript
+persist<T, U>(
+  stateCreator: StateCreator<T, [], []>,
+  options?: PersistOptions<T, U>
+): StateCreator<T, [['zustand/persist', U]], []>
+```
+
+## Parameters
+
+<ParamField path="stateCreator" type="StateCreator<T>" required>
+  The state creator function that defines your store's initial state and actions.
+</ParamField>
+
+<ParamField path="options" type="PersistOptions<T, U>">
+  Configuration options for persistence behavior.
+
+  <ParamField path="name" type="string" required>
+    Unique name for the stored item. Used as the storage key.
+  </ParamField>
+
+  <ParamField path="storage" type="PersistStorage" default="createJSONStorage(() => localStorage)">
+    Custom storage implementation. Defaults to localStorage with JSON serialization.
+  </ParamField>
+
+  <ParamField path="partialize" type="(state: T) => PersistedState">
+    Filter which parts of state to persist. Useful for excluding computed values or sensitive data.
+  </ParamField>
+
+  <ParamField path="onRehydrateStorage" type="(state: T) => ((state?: T, error?: unknown) => void) | void">
+    Callback invoked before and after state rehydration. The returned function is called after rehydration completes or if an error occurs.
+  </ParamField>
+
+  <ParamField path="version" type="number">
+    Version number for the persisted state. If the stored version doesn't match, the state won't be used.
+  </ParamField>
+
+  <ParamField path="migrate" type="(persistedState: any, version: number) => T | Promise<T>">
+    Migration function to transform persisted state when versions don't match. Allows you to handle breaking changes gracefully.
+  </ParamField>
+
+  <ParamField path="merge" type="(persistedState: any, currentState: T) => T">
+    Custom merge logic for combining persisted state with current state. Defaults to shallow merge.
+  </ParamField>
+
+  <ParamField path="skipHydration" type="boolean" default={false}>
+    If true, prevents automatic rehydration on initialization. Call `store.persist.rehydrate()` manually instead. Useful for SSR.
+  </ParamField>
+</ParamField>
+
+## Basic Usage
+
+```typescript
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+type Store = {
+  position: { x: number; y: number }
+  setPosition: (position: { x: number; y: number }) => void
+}
+
+const usePositionStore = create<Store>()(
+  persist(
+    (set) => ({
+      position: { x: 0, y: 0 },
+      setPosition: (position) => set({ position }),
+    }),
+    { name: 'position-storage' }
+  )
+)
+```
+
+## Partial Persistence
+
+Persist only specific parts of your state using `partialize`:
+
+```typescript
+const useStore = create<Store>()(
+  persist(
+    (set) => ({
+      context: {
+        position: { x: 0, y: 0 },
+      },
+      actions: {
+        setPosition: (position) => set({ context: { position } }),
+      },
+    }),
+    {
+      name: 'position-storage',
+      partialize: (state) => ({ context: state.context }),
+    }
+  )
+)
+```
+
+## Custom Storage
+
+Use custom storage engines like sessionStorage or URL parameters:
+
+```typescript
+import { createJSONStorage } from 'zustand/middleware'
+
+// Session storage
+const useStore = create(
+  persist(
+    (set) => ({ /* ... */ }),
+    {
+      name: 'my-storage',
+      storage: createJSONStorage(() => sessionStorage),
+    }
+  )
+)
+
+// Custom storage (URL parameters)
+const searchParamsStorage = {
+  getItem: (key: string) => {
+    const searchParams = new URL(location.href).searchParams
+    return searchParams.get(key)
+  },
+  setItem: (key: string, value: string) => {
+    const searchParams = new URL(location.href).searchParams
+    searchParams.set(key, value)
+    window.history.replaceState({}, '', `${location.pathname}?${searchParams}`)
+  },
+  removeItem: (key: string) => {
+    const searchParams = new URL(location.href).searchParams
+    searchParams.delete(key)
+    window.history.replaceState({}, '', `${location.pathname}?${searchParams}`)
+  },
+}
+
+const useStore = create(
+  persist(
+    (set) => ({ /* ... */ }),
+    {
+      name: 'position',
+      storage: createJSONStorage(() => searchParamsStorage),
+    }
+  )
+)
+```
+
+## Versioning and Migration
+
+Handle breaking changes to your state structure:
+
+```typescript
+const useStore = create<Store>()(
+  persist(
+    (set) => ({
+      position: { x: 0, y: 0 },
+      setPosition: (position) => set({ position }),
+    }),
+    {
+      name: 'position-storage',
+      version: 1,
+      migrate: (persistedState: any, version) => {
+        if (version === 0) {
+          // Migrate from version 0 to version 1
+          // Old format: { x: 100, y: 100 }
+          // New format: { position: { x: 100, y: 100 } }
+          return {
+            position: { x: persistedState.x, y: persistedState.y },
+          }
+        }
+        return persistedState
+      },
+    }
+  )
+)
+```
+
+## Deep Merging
+
+Use deep merge for nested objects to prevent missing fields:
+
+```typescript
+import createDeepMerge from '@fastify/deepmerge'
+
+const deepMerge = createDeepMerge({ all: true })
+
+const useStore = create<Store>()(
+  persist(
+    (set) => ({
+      position: { x: 0, y: 0 },
+      setPosition: (position) => set({ position }),
+    }),
+    {
+      name: 'position-storage',
+      merge: (persisted, current) => deepMerge(current, persisted),
+    }
+  )
+)
+```
+
+## Manual Hydration
+
+Control when state is rehydrated (useful for SSR):
+
+```typescript
+const useStore = create<Store>()(
+  persist(
+    (set) => ({
+      position: { x: 0, y: 0 },
+      setPosition: (position) => set({ position }),
+    }),
+    {
+      name: 'position-storage',
+      skipHydration: true,
+    }
+  )
+)
+
+// Later, manually trigger rehydration
+setTimeout(() => {
+  useStore.persist.rehydrate()
+}, 2000)
+```
+
+## Composing with Other Middleware
+
+```typescript
+import { devtools, persist } from 'zustand/middleware'
+
+const useStore = create<Store>()(
+  devtools(
+    persist(
+      (set) => ({
+        count: 0,
+        increment: () => set((state) => ({ count: state.count + 1 })),
+      }),
+      { name: 'counter-storage' }
+    ),
+    { name: 'CounterStore' }
+  )
+)
+```
+
+## API Methods
+
+Stores using persist middleware expose additional methods:
+
+```typescript
+// Manually trigger rehydration
+useStore.persist.rehydrate()
+
+// Check if store has been hydrated
+useStore.persist.hasHydrated()
+
+// Subscribe to hydration events
+useStore.persist.onHydrate((state) => {
+  console.log('Hydration started')
+})
+
+useStore.persist.onFinishHydration((state) => {
+  console.log('Hydration complete')
+})
+
+// Clear persisted state
+useStore.persist.clearStorage()
+```

@@ -1,0 +1,147 @@
+---
+title: 'useShallow'
+description: 'React Hook for memoizing selectors with shallow comparison'
+---
+
+`useShallow` is a React Hook that optimizes re-renders by memoizing selector functions using shallow comparison.
+
+## Import
+
+```tsx
+import { useShallow } from 'zustand/react/shallow'
+```
+
+## Signature
+
+```tsx
+function useShallow<S, U>(
+  selector: (state: S) => U
+): (state: S) => U
+```
+
+## Parameters
+
+<ParamField path="selector" type="(state: S) => U" required>
+  A selector function that extracts data from the state
+</ParamField>
+
+## Returns
+
+<ResponseField name="memoizedSelector" type="(state: S) => U">
+  A memoized version of the selector that only returns a new reference when the selected values have changed (shallow comparison)
+</ResponseField>
+
+## Usage
+
+### Optimizing object selections
+
+Without `useShallow`, selecting multiple values as an object causes re-renders on any state change:
+
+```tsx
+import { create } from 'zustand'
+
+type BearStore = {
+  papaBear: string
+  mamaBear: string
+  babyBear: string
+}
+
+const useBearStore = create<BearStore>()(() => ({
+  papaBear: 'large porridge-pot',
+  mamaBear: 'middle-size porridge pot',
+  babyBear: 'little, small, wee pot',
+}))
+
+// This re-renders whenever ANY state changes
+function BearNames() {
+  const names = useBearStore((state) => Object.keys(state))
+  return <div>{names.join(', ')}</div>
+}
+```
+
+With `useShallow`, the component only re-renders when the keys actually change:
+
+```tsx
+import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
+
+function BearNames() {
+  const names = useBearStore(
+    useShallow((state) => Object.keys(state))
+  )
+  // Only re-renders when the array of keys changes
+  return <div>{names.join(', ')}</div>
+}
+```
+
+### Selecting multiple properties
+
+```tsx
+function BearDetails() {
+  const { papaBear, mamaBear } = useBearStore(
+    useShallow((state) => ({
+      papaBear: state.papaBear,
+      mamaBear: state.mamaBear,
+    }))
+  )
+  // Only re-renders when papaBear or mamaBear change
+  
+  return (
+    <div>
+      <p>Papa: {papaBear}</p>
+      <p>Mama: {mamaBear}</p>
+    </div>
+  )
+}
+```
+
+### Selecting arrays
+
+```tsx
+type TodoStore = {
+  todos: Array<{ id: string; text: string; done: boolean }>
+  toggleTodo: (id: string) => void
+}
+
+const useTodoStore = create<TodoStore>()((set) => ({
+  todos: [],
+  toggleTodo: (id) =>
+    set((state) => ({
+      todos: state.todos.map((todo) =>
+        todo.id === id ? { ...todo, done: !todo.done } : todo
+      ),
+    })),
+}))
+
+function TodoList() {
+  const todoIds = useTodoStore(
+    useShallow((state) => state.todos.map((todo) => todo.id))
+  )
+  // Only re-renders when the array of IDs changes
+  
+  return todoIds.map((id) => <TodoItem key={id} id={id} />)
+}
+```
+
+## When to use
+
+<Check>
+**Use `useShallow` when:**
+- Selecting multiple properties as an object or array
+- The selector returns a new reference every time (like `Object.keys()`, `map()`, etc.)
+- You want to prevent unnecessary re-renders
+</Check>
+
+<Warning>
+**Don't use `useShallow` when:**
+- Selecting a single primitive value
+- The selector already returns a stable reference
+- You need deep equality comparison (use a custom equality function instead)
+</Warning>
+
+## Notes
+
+- `useShallow` uses shallow comparison, checking only top-level properties
+- For nested objects, consider using a custom equality function with `useStoreWithEqualityFn`
+- The hook wraps the selector and maintains a ref to the previous value
+- It's similar to using `useStoreWithEqualityFn` with `shallow` from `zustand/shallow`

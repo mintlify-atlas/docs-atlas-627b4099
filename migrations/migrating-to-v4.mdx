@@ -1,0 +1,348 @@
+---
+title: Migrating to v4
+description: Breaking changes and migration steps from v3 to v4
+---
+
+<Note>
+The only breaking changes in v4 are in types. If you are using Zustand with TypeScript or JSDoc type annotations, this guide applies. Otherwise, no migration is required.
+</Note>
+
+It's recommended to first read the [TypeScript Guide](/guides/typescript) to make the migration easier to understand.
+
+You can also check the [diff of test files](https://github.com/pmndrs/zustand/compare/v3.7.2...v4.0.0?short_path=37e5b4c#diff-c21e24854115b390eccde717da83f91feb2d5927a76c1485e5f0fdd0135c2afa) in the Zustand repository from v3 to v4.
+
+## `create`
+
+**Applicable imports:**
+
+```ts
+import create from 'zustand'
+import create from 'zustand/vanilla'
+```
+
+**Type signature change:**
+
+```diff
+- create:
+-   < State
+-   , StoreSetState = StoreApi<State>["set"]
+-   , StoreGetState = StoreApi<State>["get"]
+-   , Store = StoreApi<State>
+-   >
+-     (f: ...) => ...
++ create:
++   { <State>(): (f: ...) => ...
++   , <State, Mutators>(f: ...) => ...
++   }
+```
+
+<Steps>
+  <Step title="No type parameters">
+    If you are not passing any type parameters to `create`, no migration is required.
+  </Step>
+
+  <Step title="Using leaf middleware (combine or redux)">
+    If you are using a "leaf" middleware like `combine` or `redux`, remove all type parameters from `create`.
+  </Step>
+
+  <Step title="Other cases">
+    Replace `create<T, ...>(...)` with `create<T>()(...)` (note the double parentheses).
+  </Step>
+</Steps>
+
+## `StateCreator`
+
+**Applicable imports:**
+
+```ts
+import type { StateCreator } from 'zustand'
+import type { StateCreator } from 'zustand/vanilla'
+```
+
+**Type signature change:**
+
+```diff
+- type StateCreator
+-   < State
+-   , StoreSetState = StoreApi<State>["set"]
+-   , StoreGetState = StoreApi<State>["get"]
+-   , Store = StoreApi<State>
+-   > =
+-     ...
++ type StateCreator
++   < State
++   , InMutators extends [StoreMutatorIdentifier, unknown][] = []
++   , OutMutators extends [StoreMutatorIdentifier, unknown][] = []
++   , Return = State
++   > =
++     ...
+```
+
+<Note>
+If you are using `StateCreator`, you are likely authoring a middleware or using the "slices" pattern. Check the [TypeScript Guide](/guides/typescript) for more information on authoring middlewares and the slices pattern.
+</Note>
+
+## `PartialState`
+
+**Applicable imports:**
+
+```ts
+import type { PartialState } from 'zustand'
+import type { PartialState } from 'zustand/vanilla'
+```
+
+**Type signature change:**
+
+```diff
+- type PartialState
+-   < T extends State
+-   , K1 extends keyof T = keyof T
+-   , K2 extends keyof T = K1
+-   , K3 extends keyof T = K2
+-   , K4 extends keyof T = K3
+-   > =
+-   | (Pick<T, K1> | Pick<T, K2> | Pick<T, K3> | Pick<T, K4> | T)
+-   | ((state: T) => Pick<T, K1> | Pick<T, K2> | Pick<T, K3> | Pick<T, K4> | T)
++ type PartialState<T> =
++   | Partial<T>
++   | ((state: T) => Partial<T>)
+```
+
+<Steps>
+  <Step title="Replace type parameters">
+    Replace `PartialState<T, ...>` with `PartialState<T>`
+  </Step>
+
+  <Step title="Enable exactOptionalPropertyTypes">
+    Enable [`exactOptionalPropertyTypes`](https://www.typescriptlang.org/tsconfig#exactOptionalPropertyTypes) in your `tsconfig.json`:
+
+    ```json
+    {
+      "compilerOptions": {
+        "exactOptionalPropertyTypes": true
+      }
+    }
+    ```
+
+    <Note>
+    We're no longer using the trick to disallow `{ foo: undefined }` to be assigned to `Partial<{ foo: string }>`. Instead, we're relying on the `exactOptionalPropertyTypes` TypeScript option.
+    </Note>
+  </Step>
+</Steps>
+
+## `useStore`
+
+**Applicable imports:**
+
+```ts
+import { useStore } from 'zustand'
+import { useStore } from 'zustand/react'
+```
+
+**Type signature change:**
+
+```diff
+- useStore:
+-   { <State>(store: StoreApi<State>): State
+-   , <State, StateSlice>
+-       ( store: StoreApi<State>
+-       , selector: StateSelector<State, StateSlice>,
+-       , equals?: EqualityChecker<StateSlice>
+-       ): StateSlice
+-   }
++ useStore:
++   <Store, StateSlice = ExtractState<Store>>
++     ( store: Store
++     , selector?: StateSelector<State, StateSlice>,
++     , equals?: EqualityChecker<StateSlice>
++     )
++       => StateSlice
+```
+
+<Steps>
+  <Step title="No type parameters">
+    If you are not passing any type parameters to `useStore`, no migration is required.
+  </Step>
+
+  <Step title="With type parameters">
+    Remove all type parameters, or pass the **store** type instead of the **state** type as the first parameter.
+  </Step>
+</Steps>
+
+## `UseBoundStore`
+
+**Applicable imports:**
+
+```ts
+import type { UseBoundStore } from 'zustand'
+import type { UseBoundStore } from 'zustand/react'
+```
+
+**Type signature change:**
+
+```diff
+- type UseBoundStore<
+-   State,
+-   Store = StoreApi<State>
+- > =
+-   & { (): T
+-     , <StateSlice>
+-         ( selector: StateSelector<State, StateSlice>
+-         , equals?: EqualityChecker<StateSlice>
+-         ): U
+-     }
+-   & Store
++ type UseBoundStore<Store> =
++   & (<StateSlice = ExtractState<S>>
++       ( selector?: (state: ExtractState<S>) => StateSlice
++       , equals?: (a: StateSlice, b: StateSlice) => boolean
++       ) => StateSlice
++     )
++   & S
+```
+
+**Migration:**
+
+Replace `UseBoundStore<T>` with `UseBoundStore<StoreApi<T>>`, and `UseBoundStore<T, S>` with `UseBoundStore<S>`.
+
+## `UseContextStore`
+
+**Applicable imports:**
+
+```ts
+import type { UseContextStore } from 'zustand/context'
+```
+
+**Change:**
+
+```diff
+- type UseContextStore
+```
+
+<Warning>
+The `UseContextStore` type has been removed. Use `typeof MyContext.useStore` instead.
+</Warning>
+
+## `createContext`
+
+**Applicable imports:**
+
+```ts
+import createContext from 'zustand/context'
+```
+
+**Type signature change:**
+
+```diff
+  createContext:
+-   <State, Store = StoreApi<State>>() => ...
++   <Store>() => ...
+```
+
+**Migration:**
+
+Replace `createContext<T>()` with `createContext<StoreApi<T>>()`, and `createContext<T, S>()` with `createContext<S>()`.
+
+## Middleware: `combine`, `devtools`, `subscribeWithSelector`
+
+**Applicable imports:**
+
+```ts
+import { combine } from 'zustand/middleware'
+import { devtools } from 'zustand/middleware'
+import { subscribeWithSelector } from 'zustand/middleware'
+```
+
+**Type signature changes:**
+
+```diff
+- combine:
+-   <T, U>(...) => ...
++ combine:
++   <T, U, Mps, Mcs>(...) => ...
+
+- devtools:
+-   <T>(...) => ...
++ devtools:
++   <T, Mps, Mcs>(...) => ...
+
+- subscribeWithSelector:
+-   <T>(...) => ...
++ subscribeWithSelector:
++   <T, Mps, Mcs>(...) => ...
+```
+
+<Note>
+If you are not passing any type parameters to `combine`, `devtools`, or `subscribeWithSelector`, no migration is required.
+
+If you are, remove all the type parameters, as they are inferred automatically.
+</Note>
+
+## Middleware: `persist`
+
+**Applicable imports:**
+
+```ts
+import { persist } from 'zustand/middleware'
+```
+
+**Type signature change:**
+
+```diff
+- persist:
+-   <T, U = Partial<T>>(...) => ...
++ persist:
++   <T, Mps, Mcs, U = T>(...) => ...
+```
+
+<Steps>
+  <Step title="Remove type parameters">
+    If you are passing any type parameters, remove them as they are inferred automatically.
+  </Step>
+
+  <Step title="Check if you're using partialize option">
+    If you are passing the `partialize` option, no further steps are required for migration.
+  </Step>
+
+  <Step title="Handle compilation errors (if any)">
+    <Warning>
+    The type of partialized state is now `T` instead of `Partial<T>`, which aligns with the runtime behavior of the default `partialize`, which is an identity (`s => s`).
+    </Warning>
+
+    If you see compilation errors, you have to find and fix the errors yourself, as they might indicate unsound code.
+
+    **Workaround:** Pass `s => s as Partial<typeof s>` to `partialize`. If your partialized state is truly `Partial<T>`, you should not encounter any bugs.
+
+    <Note>
+    The runtime behavior has not changed, only the types are now correct.
+    </Note>
+  </Step>
+</Steps>
+
+## Middleware: `redux`
+
+**Applicable imports:**
+
+```ts
+import { redux } from 'zustand/middleware'
+```
+
+**Type signature change:**
+
+```diff
+- redux:
+-   <T, A>(...) => ...
++ redux:
++   <T, A, Mps, Mcs>(...) => ...
+```
+
+**Migration:**
+
+If you are not passing any type parameters to `redux`, no migration is required.
+
+If you are, remove all the type parameters and annotate only the second (action) parameter:
+
+```diff
+- redux<T, A>((state, action) => ..., ...)
++ redux((state, action: A) => ..., ...)
+```

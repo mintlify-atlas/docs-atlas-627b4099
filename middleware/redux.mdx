@@ -1,0 +1,319 @@
+---
+title: redux
+description: Use Redux-style actions and reducers in your store
+---
+
+The `redux` middleware enables Redux-style state management with actions and reducers. This provides a familiar pattern for developers coming from Redux while maintaining Zustand's simplicity.
+
+```typescript
+import { redux } from 'zustand/middleware'
+
+type Action = 
+  | { type: 'INCREMENT' }
+  | { type: 'DECREMENT' }
+
+const reducer = (state: number, action: Action) => {
+  switch (action.type) {
+    case 'INCREMENT': return state + 1
+    case 'DECREMENT': return state - 1
+    default: return state
+  }
+}
+
+const useStore = create(redux(reducer, 0))
+
+// Dispatch actions
+useStore.getState().dispatch({ type: 'INCREMENT' })
+```
+
+## Signature
+
+```typescript
+redux<T, A extends Action>(
+  reducer: (state: T, action: A) => T,
+  initialState: T
+): StateCreator<T & { dispatch: (action: A) => A }, [['zustand/redux', A]], []>
+```
+
+## Parameters
+
+<ParamField path="reducer" type="(state: T, action: A) => T" required>
+  A pure function that takes the current state and an action, returning the new state. Should not mutate the original state.
+</ParamField>
+
+<ParamField path="initialState" type="T" required>
+  The initial state value. Can be any type except a function.
+</ParamField>
+
+## Basic Usage
+
+```typescript
+import { create } from 'zustand'
+import { redux } from 'zustand/middleware'
+
+type State = {
+  count: number
+}
+
+type Action =
+  | { type: 'INCREMENT' }
+  | { type: 'DECREMENT' }
+  | { type: 'INCREMENT_BY'; amount: number }
+
+const reducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case 'INCREMENT':
+      return { count: state.count + 1 }
+    case 'DECREMENT':
+      return { count: state.count - 1 }
+    case 'INCREMENT_BY':
+      return { count: state.count + action.amount }
+    default:
+      return state
+  }
+}
+
+const initialState: State = { count: 0 }
+
+const useCounterStore = create(redux(reducer, initialState))
+
+// Usage
+function Counter() {
+  const count = useCounterStore((state) => state.count)
+  const dispatch = useCounterStore((state) => state.dispatch)
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => dispatch({ type: 'INCREMENT' })}>+</button>
+      <button onClick={() => dispatch({ type: 'DECREMENT' })}>-</button>
+      <button onClick={() => dispatch({ type: 'INCREMENT_BY', amount: 5 })}>
+        +5
+      </button>
+    </div>
+  )
+}
+```
+
+## Form Example
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+import { redux } from 'zustand/middleware'
+
+type PersonState = {
+  firstName: string
+  lastName: string
+  email: string
+}
+
+type PersonAction =
+  | { type: 'person/setFirstName'; firstName: string }
+  | { type: 'person/setLastName'; lastName: string }
+  | { type: 'person/setEmail'; email: string }
+  | { type: 'person/reset' }
+
+const personReducer = (
+  state: PersonState,
+  action: PersonAction
+): PersonState => {
+  switch (action.type) {
+    case 'person/setFirstName':
+      return { ...state, firstName: action.firstName }
+    case 'person/setLastName':
+      return { ...state, lastName: action.lastName }
+    case 'person/setEmail':
+      return { ...state, email: action.email }
+    case 'person/reset':
+      return initialPersonState
+    default:
+      return state
+  }
+}
+
+const initialPersonState: PersonState = {
+  firstName: 'Barbara',
+  lastName: 'Hepworth',
+  email: 'bhepworth@sculpture.com',
+}
+
+const personStore = createStore(
+  redux(personReducer, initialPersonState)
+)
+
+// Usage
+const firstNameInput = document.getElementById('first-name') as HTMLInputElement
+
+firstNameInput.addEventListener('input', (event) => {
+  personStore.getState().dispatch({
+    type: 'person/setFirstName',
+    firstName: (event.target as HTMLInputElement).value,
+  })
+})
+```
+
+## Action Creators
+
+Create helper functions for type-safe action dispatching:
+
+```typescript
+type State = {
+  todos: Array<{ id: string; text: string; completed: boolean }>
+}
+
+type Action =
+  | { type: 'ADD_TODO'; text: string }
+  | { type: 'TOGGLE_TODO'; id: string }
+  | { type: 'REMOVE_TODO'; id: string }
+
+// Action creators
+const actions = {
+  addTodo: (text: string): Action => ({ type: 'ADD_TODO', text }),
+  toggleTodo: (id: string): Action => ({ type: 'TOGGLE_TODO', id }),
+  removeTodo: (id: string): Action => ({ type: 'REMOVE_TODO', id }),
+}
+
+const reducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case 'ADD_TODO':
+      return {
+        todos: [
+          ...state.todos,
+          { id: crypto.randomUUID(), text: action.text, completed: false },
+        ],
+      }
+    case 'TOGGLE_TODO':
+      return {
+        todos: state.todos.map((todo) =>
+          todo.id === action.id
+            ? { ...todo, completed: !todo.completed }
+            : todo
+        ),
+      }
+    case 'REMOVE_TODO':
+      return {
+        todos: state.todos.filter((todo) => todo.id !== action.id),
+      }
+    default:
+      return state
+  }
+}
+
+const useStore = create(redux(reducer, { todos: [] }))
+
+// Usage with action creators
+function TodoList() {
+  const dispatch = useStore((state) => state.dispatch)
+
+  const handleAdd = (text: string) => {
+    dispatch(actions.addTodo(text))
+  }
+
+  const handleToggle = (id: string) => {
+    dispatch(actions.toggleTodo(id))
+  }
+
+  return (/* ... */)
+}
+```
+
+## Composing Reducers
+
+Combine multiple reducers for complex state:
+
+```typescript
+type CounterState = { count: number }
+type UserState = { name: string; email: string }
+
+type State = CounterState & UserState
+
+type Action =
+  | { type: 'INCREMENT' }
+  | { type: 'DECREMENT' }
+  | { type: 'SET_NAME'; name: string }
+  | { type: 'SET_EMAIL'; email: string }
+
+const counterReducer = (
+  state: CounterState,
+  action: Action
+): CounterState => {
+  switch (action.type) {
+    case 'INCREMENT':
+      return { count: state.count + 1 }
+    case 'DECREMENT':
+      return { count: state.count - 1 }
+    default:
+      return state
+  }
+}
+
+const userReducer = (state: UserState, action: Action): UserState => {
+  switch (action.type) {
+    case 'SET_NAME':
+      return { ...state, name: action.name }
+    case 'SET_EMAIL':
+      return { ...state, email: action.email }
+    default:
+      return state
+  }
+}
+
+const rootReducer = (state: State, action: Action): State => ({
+  ...counterReducer(state, action),
+  ...userReducer(state, action),
+})
+
+const useStore = create(
+  redux(rootReducer, {
+    count: 0,
+    name: '',
+    email: '',
+  })
+)
+```
+
+## Composing with DevTools
+
+Redux middleware works seamlessly with DevTools:
+
+```typescript
+import { devtools, redux } from 'zustand/middleware'
+
+const useStore = create(
+  devtools(
+    redux(reducer, initialState),
+    { name: 'ReduxStore' }
+  )
+)
+```
+
+Actions will automatically appear in Redux DevTools with their type as the action name.
+
+## TypeScript Tips
+
+Use discriminated unions for type-safe reducers:
+
+```typescript
+type State = { value: number }
+
+type Action =
+  | { type: 'SET'; value: number }
+  | { type: 'INCREMENT' }
+  | { type: 'DECREMENT' }
+
+const reducer = (state: State, action: Action): State => {
+  // TypeScript narrows the action type in each case
+  switch (action.type) {
+    case 'SET':
+      return { value: action.value } // action.value is accessible
+    case 'INCREMENT':
+      return { value: state.value + 1 }
+    case 'DECREMENT':
+      return { value: state.value - 1 }
+    default:
+      // Exhaustiveness check
+      const _exhaustive: never = action
+      return state
+  }
+}
+```

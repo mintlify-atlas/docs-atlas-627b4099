@@ -1,122 +1,133 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Zustand",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#654321",
+    "light": "#8B6F47",
+    "dark": "#3D2817"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/pmndrs/zustand"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/pmndrs/zustand"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
+              "introduction",
+              "installation",
               "quickstart",
-              "development"
+              "comparison"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "core/creating-stores",
+              "core/reading-state",
+              "core/updating-state",
+              "core/async-actions",
+              "core/vanilla-stores"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/typescript",
+              "guides/nextjs",
+              "guides/testing",
+              "guides/immutable-state-and-merging",
+              "guides/slices-pattern",
+              "guides/flux-inspired-practice",
+              "guides/ssr-and-hydration",
+              "guides/practice-with-no-store-actions",
+              "guides/initialize-state-with-props",
+              "guides/how-to-reset-state",
+              "guides/prevent-rerenders-with-use-shallow",
+              "guides/auto-generating-selectors",
+              "guides/maps-and-sets-usage",
+              "guides/connect-to-state-with-url-hash",
+              "guides/event-handler-in-pre-react-18"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Tutorials",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "tutorials/tic-tac-toe"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core APIs",
             "pages": [
-              "api-reference/introduction"
+              "api/create",
+              "api/create-store",
+              "api/create-with-equality-fn"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Hooks",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/use-store",
+              "api/use-store-with-equality-fn",
+              "api/use-shallow"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/shallow"
+            ]
+          },
+          {
+            "group": "Middleware",
+            "pages": [
+              "middleware/persist",
+              "middleware/immer",
+              "middleware/devtools",
+              "middleware/redux",
+              "middleware/subscribe-with-selector",
+              "middleware/combine"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/immer-middleware",
+              "integrations/persisting-store-data",
+              "integrations/third-party-libraries"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Migrations",
+        "groups": [
+          {
+            "group": "Version Migrations",
+            "pages": [
+              "migrations/migrating-to-v5",
+              "migrations/migrating-to-v4"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

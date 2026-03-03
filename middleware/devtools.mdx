@@ -1,0 +1,308 @@
+---
+title: devtools
+description: Time-travel debugging with Redux DevTools
+---
+
+The `devtools` middleware integrates your Zustand store with [Redux DevTools Extension](https://github.com/reduxjs/redux-devtools), enabling time-travel debugging, action inspection, and state snapshots without Redux.
+
+<Note>
+  You must install the Redux DevTools Extension in your browser and the package:
+  ```bash
+  npm install @redux-devtools/extension
+  ```
+</Note>
+
+```typescript
+import { devtools } from 'zustand/middleware'
+
+const useStore = create(
+  devtools(
+    (set) => ({
+      count: 0,
+      increment: () => set((state) => ({ count: state.count + 1 }), undefined, 'counter/increment'),
+    }),
+    { name: 'CounterStore' }
+  )
+)
+```
+
+## Signature
+
+```typescript
+devtools<T>(
+  stateCreator: StateCreator<T, [], []>,
+  options?: DevtoolsOptions
+): StateCreator<T, [['zustand/devtools', never]], []>
+```
+
+## Parameters
+
+<ParamField path="stateCreator" type="StateCreator<T>" required>
+  The state creator function that defines your store.
+</ParamField>
+
+<ParamField path="options" type="DevtoolsOptions">
+  Configuration options for Redux DevTools integration.
+
+  <ParamField path="name" type="string">
+    Custom identifier for the connection in Redux DevTools. Helps distinguish between multiple stores.
+  </ParamField>
+
+  <ParamField path="enabled" type="boolean" default="true in development, false in production">
+    Enable or disable DevTools integration. Automatically uses `NODE_ENV` to determine default.
+  </ParamField>
+
+  <ParamField path="anonymousActionType" type="string" default="'anonymous'">
+    Action type name for mutations without an explicit action name.
+  </ParamField>
+
+  <ParamField path="store" type="string">
+    Custom identifier for the store instance in DevTools.
+  </ParamField>
+
+  <ParamField path="actionsDenylist" type="string | string[]">
+    Regex patterns to filter actions from DevTools. Useful for hiding internal or sensitive actions.
+  </ParamField>
+</ParamField>
+
+## Basic Usage
+
+```typescript
+import { create } from 'zustand'
+import { devtools } from 'zustand/middleware'
+
+type Store = {
+  bears: number
+  fishes: number
+  addBear: () => void
+  addFish: () => void
+}
+
+const useJungleStore = create<Store>()(
+  devtools(
+    (set) => ({
+      bears: 0,
+      fishes: 0,
+      addBear: () =>
+        set((state) => ({ bears: state.bears + 1 }), undefined, 'jungle/addBear'),
+      addFish: () =>
+        set((state) => ({ fishes: state.fishes + 1 }), undefined, 'jungle/addFish'),
+    }),
+    { name: 'JungleStore' }
+  )
+)
+```
+
+## Named Actions
+
+Provide action names as the third parameter to `set` for better debugging:
+
+```typescript
+const useStore = create(
+  devtools((set) => ({
+    count: 0,
+    increment: () => 
+      set(
+        (state) => ({ count: state.count + 1 }),
+        undefined,  // replace flag
+        'counter/increment'  // action name
+      ),
+    decrement: () =>
+      set(
+        (state) => ({ count: state.count - 1 }),
+        undefined,
+        'counter/decrement'
+      ),
+  }))
+)
+```
+
+## Slices Pattern
+
+When using the slices pattern, properly type your slice creators:
+
+```typescript
+import { create, StateCreator } from 'zustand'
+import { devtools } from 'zustand/middleware'
+
+type BearSlice = {
+  bears: number
+  addBear: () => void
+}
+
+type FishSlice = {
+  fishes: number
+  addFish: () => void
+}
+
+type JungleStore = BearSlice & FishSlice
+
+const createBearSlice: StateCreator<
+  JungleStore,
+  [['zustand/devtools', never]],
+  [],
+  BearSlice
+> = (set) => ({
+  bears: 0,
+  addBear: () =>
+    set(
+      (state) => ({ bears: state.bears + 1 }),
+      undefined,
+      'jungle:bear/addBear'
+    ),
+})
+
+const createFishSlice: StateCreator<
+  JungleStore,
+  [['zustand/devtools', never]],
+  [],
+  FishSlice
+> = (set) => ({
+  fishes: 0,
+  addFish: () =>
+    set(
+      (state) => ({ fishes: state.fishes + 1 }),
+      undefined,
+      'jungle:fish/addFish'
+    ),
+})
+
+const useJungleStore = create<JungleStore>()(
+  devtools((...args) => ({
+    ...createBearSlice(...args),
+    ...createFishSlice(...args),
+  }))
+)
+```
+
+## Filtering Actions
+
+Hide sensitive or internal actions from DevTools:
+
+```typescript
+type Store = {
+  user: string | null
+  token: string | null
+  login: (user: string, token: string) => void
+  logout: () => void
+  updateInternal: () => void
+}
+
+const useStore = create<Store>()(
+  devtools(
+    (set) => ({
+      user: null,
+      token: null,
+      login: (user, token) => 
+        set({ user, token }, undefined, 'auth/login'),
+      logout: () => 
+        set({ user: null, token: null }, undefined, 'auth/logout'),
+      updateInternal: () =>
+        set({ user: 'updated' }, undefined, 'internal/update'),
+    }),
+    {
+      name: 'AuthStore',
+      actionsDenylist: ['internal/.*'], // Hide all 'internal/*' actions
+    }
+  )
+)
+
+// Or filter multiple patterns
+const useStore2 = create(
+  devtools(
+    (set) => ({ /* ... */ }),
+    {
+      name: 'MyStore',
+      actionsDenylist: ['secret.*', 'internal.*', 'temp.*'],
+    }
+  )
+)
+```
+
+## Cleanup
+
+Clean up DevTools connection when a store is no longer needed:
+
+```typescript
+const useStore = create(
+  devtools((set) => ({
+    count: 0,
+    increment: () => set((state) => ({ count: state.count + 1 })),
+  }))
+)
+
+// When done with the store
+useStore.devtools.cleanup()
+```
+
+This is especially useful for dynamically created stores or stores wrapped in context.
+
+## Composing with Other Middleware
+
+```typescript
+import { devtools, persist } from 'zustand/middleware'
+
+const useStore = create<Store>()(
+  devtools(
+    persist(
+      (set) => ({
+        count: 0,
+        increment: () => 
+          set((state) => ({ count: state.count + 1 }), undefined, 'increment'),
+      }),
+      { name: 'counter-storage' }
+    ),
+    { name: 'CounterStore' }
+  )
+)
+```
+
+## Conditional Enabling
+
+```typescript
+const useStore = create(
+  devtools(
+    (set) => ({ /* ... */ }),
+    {
+      name: 'MyStore',
+      enabled: process.env.NODE_ENV === 'development',
+    }
+  )
+)
+```
+
+## Troubleshooting
+
+### Multiple Stores
+
+Redux DevTools shows one store at a time by default. Use the store selector dropdown to switch between stores.
+
+### Anonymous Actions
+
+If actions show as "anonymous", ensure you're providing action names:
+
+```typescript
+// Bad - shows as 'anonymous'
+set((state) => ({ count: state.count + 1 }))
+
+// Good - shows as 'counter/increment'
+set(
+  (state) => ({ count: state.count + 1 }),
+  undefined,
+  'counter/increment'
+)
+```
+
+You can customize the anonymous action name:
+
+```typescript
+const useStore = create(
+  devtools(
+    (set) => ({ /* ... */ }),
+    {
+      name: 'MyStore',
+      anonymousActionType: 'unknown-action',
+    }
+  )
+)
+```

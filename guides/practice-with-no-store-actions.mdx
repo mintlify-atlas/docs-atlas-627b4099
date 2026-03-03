@@ -1,0 +1,307 @@
+---
+title: Practice with No Store Actions
+description: Alternative pattern for defining actions outside the Zustand store
+---
+
+The recommended usage is to colocate actions and state within the store. However, you can also define actions externally at the module level for certain advantages.
+
+## Recommended: Colocated Actions
+
+The standard approach keeps actions and state together:
+
+```js
+export const useBoundStore = create((set) => ({
+  count: 0,
+  text: 'hello',
+  inc: () => set((state) => ({ count: state.count + 1 })),
+  setText: (text) => set({ text }),
+}))
+```
+
+<Info>
+  This creates a self-contained store with data and actions together, which is the recommended pattern for most use cases.
+</Info>
+
+## Alternative: External Actions
+
+Actions can be defined at the module level, outside the store:
+
+```js
+export const useBoundStore = create(() => ({
+  count: 0,
+  text: 'hello',
+}))
+
+export const inc = () =>
+  useBoundStore.setState((state) => ({ count: state.count + 1 }))
+
+export const setText = (text) => useBoundStore.setState({ text })
+```
+
+## Advantages of External Actions
+
+<CardGroup cols={2}>
+  <Card title="No Hook Required" icon="bolt">
+    Call actions without using a hook—useful in event handlers, utilities, or non-React code
+  </Card>
+  <Card title="Code Splitting" icon="scissors">
+    Facilitates code splitting by separating action logic from state definition
+  </Card>
+</CardGroup>
+
+## Usage Comparison
+
+<Tabs>
+  <Tab title="Colocated Actions">
+    ```jsx
+    import { useBoundStore } from './store'
+
+    function Counter() {
+      const count = useBoundStore((state) => state.count)
+      const inc = useBoundStore((state) => state.inc)
+
+      return (
+        <div>
+          <p>Count: {count}</p>
+          <button onClick={inc}>Increment</button>
+        </div>
+      )
+    }
+    ```
+
+    <Info>Must use hooks to access both state and actions.</Info>
+  </Tab>
+
+  <Tab title="External Actions">
+    ```jsx
+    import { useBoundStore, inc } from './store'
+
+    function Counter() {
+      const count = useBoundStore((state) => state.count)
+      // No need to select the action from the store
+
+      return (
+        <div>
+          <p>Count: {count}</p>
+          <button onClick={inc}>Increment</button>
+        </div>
+      )
+    }
+    ```
+
+    <Info>Actions can be imported and called directly without hooks.</Info>
+  </Tab>
+</Tabs>
+
+## Using Actions Outside Components
+
+External actions shine when called outside of React components:
+
+<CodeGroup>
+```js Event Handler
+import { inc, setText } from './store'
+
+// Call directly in event listeners
+document.getElementById('btn').addEventListener('click', () => {
+  inc()
+  setText('clicked')
+})
+```
+
+```js Utility Function
+import { setText } from './store'
+
+export function logAndUpdate(message) {
+  console.log(message)
+  setText(message)
+}
+```
+
+```js Async Operation
+import { useBoundStore, setText } from './store'
+
+async function fetchData() {
+  setText('loading...')
+  const response = await fetch('/api/data')
+  const data = await response.json()
+  setText(data.text)
+}
+```
+</CodeGroup>
+
+## Complete Example
+
+<Steps>
+  <Step title="Define Store with External Actions">
+    ```js store.js
+    import { create } from 'zustand'
+
+    // Store only contains state
+    export const useStore = create(() => ({
+      count: 0,
+      text: 'hello',
+      todos: [],
+    }))
+
+    // Actions are exported separately
+    export const inc = () =>
+      useStore.setState((state) => ({ count: state.count + 1 }))
+
+    export const dec = () =>
+      useStore.setState((state) => ({ count: state.count - 1 }))
+
+    export const setText = (text) => useStore.setState({ text })
+
+    export const addTodo = (todo) =>
+      useStore.setState((state) => ({ todos: [...state.todos, todo] }))
+
+    export const removeTodo = (index) =>
+      useStore.setState((state) => ({
+        todos: state.todos.filter((_, i) => i !== index),
+      }))
+    ```
+  </Step>
+
+  <Step title="Use in Components">
+    ```jsx App.jsx
+    import { useStore, inc, dec, setText, addTodo } from './store'
+
+    function App() {
+      const count = useStore((state) => state.count)
+      const text = useStore((state) => state.text)
+      const todos = useStore((state) => state.todos)
+
+      return (
+        <div>
+          <div>
+            <p>Count: {count}</p>
+            <button onClick={inc}>+</button>
+            <button onClick={dec}>-</button>
+          </div>
+
+          <div>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <button onClick={() => addTodo(text)}>Add Todo</button>
+            <ul>
+              {todos.map((todo, i) => (
+                <li key={i}>{todo}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )
+    }
+    ```
+  </Step>
+
+  <Step title="Use Outside Components">
+    ```js analytics.js
+    import { inc, setText } from './store'
+
+    // Track button clicks
+    export function trackClick() {
+      analytics.track('button_clicked')
+      inc()
+    }
+
+    // Handle global keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        setText('')
+      }
+    })
+    ```
+  </Step>
+</Steps>
+
+## When to Use This Pattern
+
+<AccordionGroup>
+  <Accordion title="✅ Good Use Cases">
+    - Calling actions from non-React code (event listeners, utilities)
+    - Large applications with code-splitting requirements
+    - Actions that need to be called before React tree is mounted
+    - Sharing actions across multiple components without prop drilling
+    - Testing actions in isolation
+  </Accordion>
+
+  <Accordion title="❌ When to Avoid">
+    - Small to medium applications where encapsulation is preferred
+    - When all actions are only called from React components
+    - When you want a single source of truth with clear boundaries
+    - When using TypeScript and want automatic type inference for actions
+  </Accordion>
+</AccordionGroup>
+
+## Combining Both Patterns
+
+You can mix both approaches:
+
+```js
+export const useStore = create((set) => ({
+  count: 0,
+  text: 'hello',
+  // Some actions colocated
+  inc: () => set((state) => ({ count: state.count + 1 })),
+}))
+
+// Some actions external
+export const setText = (text) => useStore.setState({ text })
+```
+
+## TypeScript Support
+
+```ts
+import { create } from 'zustand'
+
+interface State {
+  count: number
+  text: string
+}
+
+export const useStore = create<State>()(() => ({
+  count: 0,
+  text: 'hello',
+}))
+
+export const inc = () =>
+  useStore.setState((state) => ({ count: state.count + 1 }))
+
+export const setText = (text: string) => useStore.setState({ text })
+```
+
+## Trade-offs
+
+<CardGroup cols={2}>
+  <Card title="Colocated Actions" icon="layer-group">
+    **Pros**: Encapsulation, single source of truth, better type inference
+    
+    **Cons**: Must use hooks, harder to call from outside React
+  </Card>
+  <Card title="External Actions" icon="external-link">
+    **Pros**: No hooks needed, easier code splitting, flexible usage
+    
+    **Cons**: Less encapsulation, actions and state are separate
+  </Card>
+</CardGroup>
+
+<Note>
+  While this pattern doesn't offer any downsides, some developers prefer colocating actions due to its encapsulated nature and clearer boundaries.
+</Note>
+
+## Related Guides
+
+<CardGroup cols={2}>
+  <Card title="Flux-Inspired Practices" icon="diagram-project" href="/guides/flux-inspired-practice">
+    Learn recommended patterns for structuring stores
+  </Card>
+  <Card title="Auto-generating Selectors" icon="wand-magic-sparkles" href="/guides/auto-generating-selectors">
+    Generate selectors automatically for better ergonomics
+  </Card>
+</CardGroup>

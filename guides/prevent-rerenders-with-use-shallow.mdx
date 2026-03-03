@@ -1,0 +1,116 @@
+---
+title: Prevent Re-renders with useShallow
+description: Learn how to use useShallow to prevent unnecessary re-renders when working with computed state
+---
+
+When you need to subscribe to a computed state from a store, the recommended way is to use a selector. However, the computed selector will cause a re-render if the output has changed according to [Object.is](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is).
+
+In cases where the computed value is always shallow equal to the previous one, you can use `useShallow` to avoid unnecessary re-renders.
+
+## The Problem
+
+Consider a store that associates each bear with a meal:
+
+```javascript
+import { create } from 'zustand'
+
+const useMeals = create(() => ({
+  papaBear: 'large porridge-pot',
+  mamaBear: 'middle-size porridge pot',
+  littleBear: 'A little, small, wee pot',
+}))
+
+export const BearNames = () => {
+  const names = useMeals((state) => Object.keys(state))
+
+  return <div>{names.join(', ')}</div>
+}
+```
+
+Now when papa bear wants a pizza instead:
+
+```javascript
+useMeals.setState({
+  papaBear: 'a large pizza',
+})
+```
+
+<Warning>
+This change causes `BearNames` to re-render even though the actual output of `names` has not changed according to shallow equality. The array `['papaBear', 'mamaBear', 'littleBear']` is recreated with a new reference each time.
+</Warning>
+
+## The Solution: useShallow
+
+Wrap your selector with `useShallow` to compare the result using shallow equality:
+
+```javascript
+import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
+
+const useMeals = create(() => ({
+  papaBear: 'large porridge-pot',
+  mamaBear: 'middle-size porridge pot',
+  littleBear: 'A little, small, wee pot',
+}))
+
+export const BearNames = () => {
+  const names = useMeals(useShallow((state) => Object.keys(state)))
+
+  return <div>{names.join(', ')}</div>
+}
+```
+
+<Tip>
+Now the bears can all order different meals without causing unnecessary re-renders of the `BearNames` component. The component only re-renders when the keys actually change.
+</Tip>
+
+## When to Use useShallow
+
+<CardGroup cols={2}>
+  <Card title="Use useShallow" icon="check" color="#10b981">
+    - Selecting arrays of values
+    - Selecting objects with multiple properties
+    - Any computed value that returns a new reference but with shallow-equal contents
+  </Card>
+  <Card title="Skip useShallow" icon="xmark" color="#ef4444">
+    - Selecting primitive values (strings, numbers, booleans)
+    - Selecting single object references
+    - When you need deep equality checks
+  </Card>
+</CardGroup>
+
+## Common Use Cases
+
+<Tabs>
+  <Tab title="Array Selection">
+    ```javascript
+    // Without useShallow - re-renders on any state change
+    const items = useStore((state) => state.items.map(item => item.id))
+
+    // With useShallow - only re-renders when IDs actually change
+    const items = useStore(useShallow((state) => state.items.map(item => item.id)))
+    ```
+  </Tab>
+  <Tab title="Object Selection">
+    ```javascript
+    // Without useShallow - re-renders on any state change
+    const user = useStore((state) => ({ name: state.name, email: state.email }))
+
+    // With useShallow - only re-renders when name or email changes
+    const user = useStore(useShallow((state) => ({ name: state.name, email: state.email })))
+    ```
+  </Tab>
+  <Tab title="Multiple Values">
+    ```javascript
+    // Without useShallow - re-renders on any state change
+    const [name, age] = useStore((state) => [state.name, state.age])
+
+    // With useShallow - only re-renders when name or age changes
+    const [name, age] = useStore(useShallow((state) => [state.name, state.age]))
+    ```
+  </Tab>
+</Tabs>
+
+<Info>
+`useShallow` performs a shallow comparison of the selector result, checking if all values at the first level are equal using `Object.is`. This is perfect for arrays and objects with primitive values.
+</Info>

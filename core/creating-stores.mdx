@@ -1,0 +1,305 @@
+---
+title: Creating Stores
+description: Learn how to create Zustand stores with create() and createStore()
+---
+
+Zustand provides two primary ways to create stores: `create()` for React applications and `createStore()` for vanilla JavaScript/TypeScript.
+
+## Creating React Stores with create()
+
+The `create()` function creates a React Hook that manages state and provides API utilities.
+
+### Type Signature
+
+```typescript
+type Create = {
+  <T, Mos extends [StoreMutatorIdentifier, unknown][] = []>(
+    initializer: StateCreator<T, [], Mos>,
+  ): UseBoundStore<Mutate<StoreApi<T>, Mos>>
+}
+```
+
+### Basic Usage
+
+<Steps>
+  <Step title="Import create">
+    Import the `create` function from Zustand.
+
+    ```typescript
+    import { create } from 'zustand'
+    ```
+  </Step>
+
+  <Step title="Define your state creator">
+    The state creator function receives three arguments:
+    - `set`: Function to update state
+    - `get`: Function to read current state
+    - `store`: The store API object
+
+    ```typescript
+    type BearStore = {
+      bears: number
+      increasePopulation: () => void
+      removeAllBears: () => void
+    }
+
+    const useBearStore = create<BearStore>((set) => ({
+      bears: 0,
+      increasePopulation: () => set((state) => ({ bears: state.bears + 1 })),
+      removeAllBears: () => set({ bears: 0 }),
+    }))
+    ```
+  </Step>
+
+  <Step title="Use the hook in components">
+    The returned hook can be used directly in React components.
+
+    ```tsx
+    function BearCounter() {
+      const bears = useBearStore((state) => state.bears)
+      return <h1>{bears} bears around here...</h1>
+    }
+    ```
+  </Step>
+</Steps>
+
+### Understanding the State Creator Function
+
+The state creator is the heart of your store. It defines the initial state and actions.
+
+<CodeGroup>
+```typescript Basic State Creator
+const useCountStore = create<{ count: number }>((set) => ({
+  count: 0,
+}))
+```
+
+```typescript With Actions
+type CounterStore = {
+  count: number
+  increment: () => void
+  decrement: () => void
+  reset: () => void
+}
+
+const useCountStore = create<CounterStore>((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  decrement: () => set((state) => ({ count: state.count - 1 })),
+  reset: () => set({ count: 0 }),
+}))
+```
+
+```typescript Using get
+type TodoStore = {
+  todos: string[]
+  addTodo: (text: string) => void
+  getTodoCount: () => number
+}
+
+const useTodoStore = create<TodoStore>((set, get) => ({
+  todos: [],
+  addTodo: (text) => set((state) => ({ todos: [...state.todos, text] })),
+  getTodoCount: () => get().todos.length,
+}))
+```
+</CodeGroup>
+
+### The set Function
+
+The `set` function is how you update state in Zustand. It accepts two arguments:
+
+<ParamField path="partial" type="T | Partial<T> | (state: T) => T | Partial<T>">
+  The new state or a function that returns the new state
+</ParamField>
+
+<ParamField path="replace" type="boolean" default="false">
+  Whether to replace the entire state instead of merging
+</ParamField>
+
+<Tabs>
+  <Tab title="Partial Update">
+    By default, `set` performs a shallow merge:
+
+    ```typescript
+    set({ count: 1 }) // Merges { count: 1 } with existing state
+    ```
+  </Tab>
+
+  <Tab title="Function Update">
+    Use a function when the new state depends on the previous state:
+
+    ```typescript
+    set((state) => ({ count: state.count + 1 }))
+    ```
+  </Tab>
+
+  <Tab title="Replace Mode">
+    Use the second parameter to replace the entire state:
+
+    ```typescript
+    set({ count: 1 }, true) // Replaces entire state
+    ```
+  </Tab>
+</Tabs>
+
+### The get Function
+
+The `get` function returns the current state:
+
+```typescript
+const useStore = create<{ count: number; double: () => number }>((set, get) => ({
+  count: 5,
+  double: () => get().count * 2,
+}))
+```
+
+<Note>
+The `get` function is useful for actions that need to read the current state without causing re-renders.
+</Note>
+
+## Creating Vanilla Stores with createStore()
+
+The `createStore()` function creates a vanilla store that can be used outside of React.
+
+### Type Signature
+
+```typescript
+type CreateStore = {
+  <T, Mos extends [StoreMutatorIdentifier, unknown][] = []>(
+    initializer: StateCreator<T, [], Mos>,
+  ): Mutate<StoreApi<T>, Mos>
+}
+```
+
+### Basic Usage
+
+```typescript
+import { createStore } from 'zustand/vanilla'
+
+type CounterState = {
+  count: number
+  increment: () => void
+}
+
+const counterStore = createStore<CounterState>()((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+}))
+
+// Access state directly
+counterStore.getState().count // 0
+
+// Call actions
+counterStore.getState().increment()
+
+// Subscribe to changes
+const unsubscribe = counterStore.subscribe((state, prevState) => {
+  console.log('count changed from', prevState.count, 'to', state.count)
+})
+```
+
+### StoreApi Interface
+
+Both `create()` and `createStore()` return a store that implements the `StoreApi` interface:
+
+```typescript
+interface StoreApi<T> {
+  setState: SetStateInternal<T>
+  getState: () => T
+  getInitialState: () => T
+  subscribe: (listener: (state: T, prevState: T) => void) => () => void
+}
+```
+
+<Info>
+The main difference between `create()` and `createStore()` is that `create()` returns a React Hook with the StoreApi attached, while `createStore()` returns just the StoreApi.
+</Info>
+
+## TypeScript Support
+
+Zustand has excellent TypeScript support. You can define your state types explicitly:
+
+<CodeGroup>
+```typescript Separate Types
+type State = {
+  count: number
+  text: string
+}
+
+type Actions = {
+  increment: () => void
+  setText: (text: string) => void
+}
+
+type Store = State & Actions
+
+const useStore = create<Store>()((set) => ({
+  count: 0,
+  text: '',
+  increment: () => set((state) => ({ count: state.count + 1 })),
+  setText: (text) => set({ text }),
+}))
+```
+
+```typescript Inline Types
+const useStore = create<{
+  count: number
+  increment: () => void
+}>()((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+}))
+```
+</CodeGroup>
+
+<Warning>
+When using TypeScript, make sure to use the curried version `create<T>()((set) => ...)` to get proper type inference.
+</Warning>
+
+## Common Patterns
+
+### Separating State and Actions
+
+```typescript
+type State = {
+  firstName: string
+  lastName: string
+}
+
+type Actions = {
+  updateFirstName: (firstName: State['firstName']) => void
+  updateLastName: (lastName: State['lastName']) => void
+}
+
+const usePersonStore = create<State & Actions>((set) => ({
+  firstName: '',
+  lastName: '',
+  updateFirstName: (firstName) => set({ firstName }),
+  updateLastName: (lastName) => set({ lastName }),
+}))
+```
+
+### Using Primitives as State
+
+```typescript
+const useCount = create<number>(() => 0)
+
+// Update with replace flag
+useCount.setState((count) => count + 1, true)
+```
+
+<Tip>
+When your state is a primitive value, always use the `replace` flag set to `true` when calling `setState`.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Reading State" icon="book-open" href="/core/reading-state">
+    Learn how to read and select state in components
+  </Card>
+  <Card title="Updating State" icon="pen" href="/core/updating-state">
+    Master state updates and immutable patterns
+  </Card>
+</CardGroup>

@@ -1,0 +1,267 @@
+---
+title: immer
+description: Write immutable state updates using mutable syntax
+---
+
+The `immer` middleware enables you to write state updates using mutable syntax while maintaining immutability under the hood. This eliminates boilerplate code when updating nested objects and arrays.
+
+<Note>
+  You must install `immer` as a dependency to use this middleware:
+  ```bash
+  npm install immer
+  ```
+</Note>
+
+```typescript
+import { immer } from 'zustand/middleware/immer'
+
+const useStore = create(
+  immer((set) => ({
+    person: { name: 'John', age: 30 },
+    updateName: (name: string) =>
+      set((state) => {
+        state.person.name = name
+      }),
+  }))
+)
+```
+
+## Signature
+
+```typescript
+immer<T>(
+  stateCreator: StateCreator<T, [], []>
+): StateCreator<T, [['zustand/immer', never]], []>
+```
+
+## Parameters
+
+<ParamField path="stateCreator" type="StateCreator<T>" required>
+  The state creator function that defines your store. The `set` function accepts Immer draft mutations.
+</ParamField>
+
+## Without Immer
+
+Traditional immutable updates require spreading nested objects:
+
+```typescript
+import { create } from 'zustand'
+
+type PersonStore = {
+  person: { firstName: string; lastName: string; email: string }
+  setPerson: (updater: (person: PersonStore['person']) => PersonStore['person']) => void
+}
+
+const usePersonStore = create<PersonStore>()((set) => ({
+  person: {
+    firstName: 'Barbara',
+    lastName: 'Hepworth',
+    email: 'bhepworth@sculpture.com',
+  },
+  setPerson: (updater) =>
+    set((state) => ({
+      person: updater(state.person),
+    })),
+}))
+
+// Usage requires spreading
+function handleFirstNameChange(firstName: string) {
+  usePersonStore.getState().setPerson((person) => ({
+    ...person,
+    firstName,
+  }))
+}
+```
+
+## With Immer
+
+Immer allows direct mutation of draft state:
+
+```typescript
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+
+type PersonStore = {
+  person: { firstName: string; lastName: string; email: string }
+  updateFirstName: (firstName: string) => void
+  updateLastName: (lastName: string) => void
+  updateEmail: (email: string) => void
+}
+
+const usePersonStore = create<PersonStore>()(
+  immer((set) => ({
+    person: {
+      firstName: 'Barbara',
+      lastName: 'Hepworth',
+      email: 'bhepworth@sculpture.com',
+    },
+    updateFirstName: (firstName) =>
+      set((state) => {
+        state.person.firstName = firstName
+      }),
+    updateLastName: (lastName) =>
+      set((state) => {
+        state.person.lastName = lastName
+      }),
+    updateEmail: (email) =>
+      set((state) => {
+        state.person.email = email
+      }),
+  }))
+)
+
+// Usage is cleaner
+function handleFirstNameChange(firstName: string) {
+  usePersonStore.getState().updateFirstName(firstName)
+}
+```
+
+## Nested Arrays
+
+Immer shines when working with nested arrays:
+
+```typescript
+type TodoStore = {
+  todos: Array<{ id: string; text: string; completed: boolean }>
+  toggleTodo: (id: string) => void
+  addTodo: (text: string) => void
+  removeTodo: (id: string) => void
+}
+
+const useTodoStore = create<TodoStore>()(
+  immer((set) => ({
+    todos: [],
+    toggleTodo: (id) =>
+      set((state) => {
+        const todo = state.todos.find((t) => t.id === id)
+        if (todo) {
+          todo.completed = !todo.completed
+        }
+      }),
+    addTodo: (text) =>
+      set((state) => {
+        state.todos.push({
+          id: crypto.randomUUID(),
+          text,
+          completed: false,
+        })
+      }),
+    removeTodo: (id) =>
+      set((state) => {
+        const index = state.todos.findIndex((t) => t.id === id)
+        if (index !== -1) {
+          state.todos.splice(index, 1)
+        }
+      }),
+  }))
+)
+```
+
+## Deep Nested Updates
+
+```typescript
+type Store = {
+  user: {
+    profile: {
+      settings: {
+        notifications: {
+          email: boolean
+          push: boolean
+        }
+      }
+    }
+  }
+  toggleEmailNotifications: () => void
+}
+
+const useStore = create<Store>()(
+  immer((set) => ({
+    user: {
+      profile: {
+        settings: {
+          notifications: {
+            email: true,
+            push: false,
+          },
+        },
+      },
+    },
+    toggleEmailNotifications: () =>
+      set((state) => {
+        state.user.profile.settings.notifications.email =
+          !state.user.profile.settings.notifications.email
+      }),
+  }))
+)
+```
+
+## Composing with Other Middleware
+
+```typescript
+import { devtools, persist } from 'zustand/middleware'
+import { immer } from 'zustand/middleware/immer'
+
+const useStore = create<Store>()(
+  devtools(
+    persist(
+      immer((set) => ({
+        count: 0,
+        increment: () =>
+          set((state) => {
+            state.count += 1
+          }),
+      })),
+      { name: 'counter-storage' }
+    ),
+    { name: 'CounterStore' }
+  )
+)
+```
+
+## Type Safety
+
+Immer preserves TypeScript types and provides autocomplete:
+
+```typescript
+type Store = {
+  data: {
+    name: string
+    count: number
+  }
+  update: () => void
+}
+
+const useStore = create<Store>()(
+  immer((set) => ({
+    data: { name: 'test', count: 0 },
+    update: () =>
+      set((state) => {
+        // TypeScript knows state.data has name and count
+        state.data.count += 1
+        state.data.name = state.data.name.toUpperCase()
+      }),
+  }))
+)
+```
+
+## Returning Values
+
+Immer mutations can return values:
+
+```typescript
+const useStore = create<Store>()(
+  immer((set) => ({
+    items: [],
+    addItem: (item: Item) =>
+      set((state) => {
+        state.items.push(item)
+        return state // Optional: explicitly return state
+      }),
+    // Or return a completely new state
+    reset: () =>
+      set(() => ({
+        items: [],
+      })),
+  }))
+)
+```

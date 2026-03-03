@@ -1,0 +1,568 @@
+---
+title: Async Actions
+description: Learn how to handle asynchronous operations in Zustand stores
+---
+
+Zustand makes it easy to handle asynchronous operations like API calls, timers, and other async tasks directly in your store actions.
+
+## Basic Async Actions
+
+Asynchronous actions in Zustand are just regular async functions:
+
+```typescript
+import { create } from 'zustand'
+
+type User = {
+  id: number
+  name: string
+}
+
+type UserStore = {
+  user: User | null
+  loading: boolean
+  error: string | null
+  fetchUser: (id: number) => Promise<void>
+}
+
+const useUserStore = create<UserStore>()((set) => ({
+  user: null,
+  loading: false,
+  error: null,
+  fetchUser: async (id) => {
+    set({ loading: true, error: null })
+    
+    try {
+      const response = await fetch(`/api/users/${id}`)
+      const user = await response.json()
+      set({ user, loading: false })
+    } catch (error) {
+      set({ error: error.message, loading: false })
+    }
+  },
+}))
+```
+
+<Info>
+No special configuration needed - just write async functions as you normally would!
+</Info>
+
+## Common Async Patterns
+
+### Loading States
+
+Track loading, success, and error states:
+
+<CodeGroup>
+```typescript Basic Pattern
+type State = {
+  data: string[] | null
+  loading: boolean
+  error: string | null
+  fetchData: () => Promise<void>
+}
+
+const useStore = create<State>()((set) => ({
+  data: null,
+  loading: false,
+  error: null,
+  fetchData: async () => {
+    set({ loading: true, error: null })
+    
+    try {
+      const response = await fetch('/api/data')
+      const data = await response.json()
+      set({ data, loading: false })
+    } catch (error) {
+      set({ error: error.message, loading: false, data: null })
+    }
+  },
+}))
+```
+
+```typescript Advanced Pattern
+type RequestState = 
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: string[] }
+  | { status: 'error'; error: string }
+
+type State = {
+  request: RequestState
+  fetchData: () => Promise<void>
+}
+
+const useStore = create<State>()((set) => ({
+  request: { status: 'idle' },
+  fetchData: async () => {
+    set({ request: { status: 'loading' } })
+    
+    try {
+      const response = await fetch('/api/data')
+      const data = await response.json()
+      set({ request: { status: 'success', data } })
+    } catch (error) {
+      set({ request: { status: 'error', error: error.message } })
+    }
+  },
+}))
+```
+</CodeGroup>
+
+### Using the Store in Components
+
+<Tabs>
+  <Tab title="Basic Loading">
+    ```tsx
+    function UserProfile({ userId }: { userId: number }) {
+      const { user, loading, error, fetchUser } = useUserStore()
+
+      useEffect(() => {
+        fetchUser(userId)
+      }, [userId, fetchUser])
+
+      if (loading) return <div>Loading...</div>
+      if (error) return <div>Error: {error}</div>
+      if (!user) return <div>No user found</div>
+
+      return (
+        <div>
+          <h1>{user.name}</h1>
+          <p>ID: {user.id}</p>
+        </div>
+      )
+    }
+    ```
+  </Tab>
+
+  <Tab title="With Selectors">
+    ```tsx
+    function UserProfile({ userId }: { userId: number }) {
+      const user = useUserStore((state) => state.user)
+      const loading = useUserStore((state) => state.loading)
+      const error = useUserStore((state) => state.error)
+      const fetchUser = useUserStore((state) => state.fetchUser)
+
+      useEffect(() => {
+        fetchUser(userId)
+      }, [userId, fetchUser])
+
+      if (loading) return <div>Loading...</div>
+      if (error) return <div>Error: {error}</div>
+      if (!user) return <div>No user found</div>
+
+      return (
+        <div>
+          <h1>{user.name}</h1>
+          <p>ID: {user.id}</p>
+        </div>
+      )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Multiple Concurrent Requests
+
+Handle multiple async operations simultaneously:
+
+```typescript
+type PostsStore = {
+  posts: Post[]
+  comments: Comment[]
+  loading: {
+    posts: boolean
+    comments: boolean
+  }
+  fetchPosts: () => Promise<void>
+  fetchComments: () => Promise<void>
+  fetchAll: () => Promise<void>
+}
+
+const usePostsStore = create<PostsStore>()((set, get) => ({
+  posts: [],
+  comments: [],
+  loading: {
+    posts: false,
+    comments: false,
+  },
+  fetchPosts: async () => {
+    set((state) => ({
+      loading: { ...state.loading, posts: true },
+    }))
+    
+    const response = await fetch('/api/posts')
+    const posts = await response.json()
+    
+    set((state) => ({
+      posts,
+      loading: { ...state.loading, posts: false },
+    }))
+  },
+  fetchComments: async () => {
+    set((state) => ({
+      loading: { ...state.loading, comments: true },
+    }))
+    
+    const response = await fetch('/api/comments')
+    const comments = await response.json()
+    
+    set((state) => ({
+      comments,
+      loading: { ...state.loading, comments: false },
+    }))
+  },
+  fetchAll: async () => {
+    // Fetch both in parallel
+    await Promise.all([
+      get().fetchPosts(),
+      get().fetchComments(),
+    ])
+  },
+}))
+```
+
+<Tip>
+Use `Promise.all()` to fetch multiple resources in parallel for better performance.
+</Tip>
+
+## Canceling Async Operations
+
+Use AbortController to cancel in-flight requests:
+
+```typescript
+type SearchStore = {
+  results: string[]
+  loading: boolean
+  search: (query: string) => Promise<void>
+  abortController: AbortController | null
+}
+
+const useSearchStore = create<SearchStore>()((set, get) => ({
+  results: [],
+  loading: false,
+  abortController: null,
+  search: async (query) => {
+    // Cancel previous request
+    get().abortController?.abort()
+    
+    const controller = new AbortController()
+    set({ abortController: controller, loading: true })
+    
+    try {
+      const response = await fetch(`/api/search?q=${query}`, {
+        signal: controller.signal,
+      })
+      const results = await response.json()
+      set({ results, loading: false })
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Request was cancelled')
+      } else {
+        set({ loading: false })
+      }
+    }
+  },
+}))
+```
+
+## Debouncing and Throttling
+
+<Tabs>
+  <Tab title="External Helper">
+    Use a debounce utility:
+
+    ```typescript
+    // utils/debounce.ts
+    export function debounce<T extends (...args: any[]) => any>(
+      func: T,
+      wait: number
+    ): (...args: Parameters<T>) => void {
+      let timeout: NodeJS.Timeout | null = null
+      return (...args: Parameters<T>) => {
+        if (timeout) clearTimeout(timeout)
+        timeout = setTimeout(() => func(...args), wait)
+      }
+    }
+
+    // store.ts
+    import { debounce } from './utils/debounce'
+
+    type SearchStore = {
+      query: string
+      results: string[]
+      search: (query: string) => void
+      performSearch: (query: string) => Promise<void>
+    }
+
+    const useSearchStore = create<SearchStore>()((set, get) => {
+      const performSearch = async (query: string) => {
+        const response = await fetch(`/api/search?q=${query}`)
+        const results = await response.json()
+        set({ results })
+      }
+
+      const debouncedSearch = debounce(performSearch, 300)
+
+      return {
+        query: '',
+        results: [],
+        search: (query) => {
+          set({ query })
+          debouncedSearch(query)
+        },
+        performSearch,
+      }
+    })
+    ```
+  </Tab>
+
+  <Tab title="Manual Timeout">
+    ```typescript
+    type SearchStore = {
+      query: string
+      results: string[]
+      searchTimeout: NodeJS.Timeout | null
+      search: (query: string) => void
+    }
+
+    const useSearchStore = create<SearchStore>()((set, get) => ({
+      query: '',
+      results: [],
+      searchTimeout: null,
+      search: (query) => {
+        set({ query })
+        
+        // Clear previous timeout
+        const prevTimeout = get().searchTimeout
+        if (prevTimeout) clearTimeout(prevTimeout)
+        
+        // Set new timeout
+        const timeout = setTimeout(async () => {
+          const response = await fetch(`/api/search?q=${query}`)
+          const results = await response.json()
+          set({ results })
+        }, 300)
+        
+        set({ searchTimeout: timeout })
+      },
+    }))
+    ```
+  </Tab>
+</Tabs>
+
+## Optimistic Updates
+
+Update the UI immediately, then sync with the server:
+
+```typescript
+type Todo = {
+  id: number
+  text: string
+  done: boolean
+}
+
+type TodoStore = {
+  todos: Todo[]
+  toggleTodo: (id: number) => Promise<void>
+}
+
+const useTodoStore = create<TodoStore>()((set, get) => ({
+  todos: [],
+  toggleTodo: async (id) => {
+    // Optimistically update UI
+    const previousTodos = get().todos
+    set({
+      todos: previousTodos.map((todo) =>
+        todo.id === id ? { ...todo, done: !todo.done } : todo
+      ),
+    })
+    
+    try {
+      // Sync with server
+      await fetch(`/api/todos/${id}/toggle`, { method: 'POST' })
+    } catch (error) {
+      // Revert on error
+      set({ todos: previousTodos })
+      console.error('Failed to toggle todo:', error)
+    }
+  },
+}))
+```
+
+<Warning>
+Always handle errors in optimistic updates and revert to the previous state if the request fails.
+</Warning>
+
+## Polling
+
+Periodically fetch data:
+
+```typescript
+type PollingStore = {
+  data: any | null
+  intervalId: NodeJS.Timeout | null
+  startPolling: () => void
+  stopPolling: () => void
+  fetchData: () => Promise<void>
+}
+
+const usePollingStore = create<PollingStore>()((set, get) => ({
+  data: null,
+  intervalId: null,
+  fetchData: async () => {
+    const response = await fetch('/api/data')
+    const data = await response.json()
+    set({ data })
+  },
+  startPolling: () => {
+    // Fetch immediately
+    get().fetchData()
+    
+    // Then poll every 5 seconds
+    const intervalId = setInterval(() => {
+      get().fetchData()
+    }, 5000)
+    
+    set({ intervalId })
+  },
+  stopPolling: () => {
+    const intervalId = get().intervalId
+    if (intervalId) {
+      clearInterval(intervalId)
+      set({ intervalId: null })
+    }
+  },
+}))
+```
+
+## Error Handling
+
+<Steps>
+  <Step title="Store error state">
+    Always include an error field in your store:
+
+    ```typescript
+    type State = {
+      data: any | null
+      error: string | null
+      loading: boolean
+    }
+    ```
+  </Step>
+
+  <Step title="Clear errors on new requests">
+    ```typescript
+    fetchData: async () => {
+      set({ loading: true, error: null }) // Clear previous error
+      // ...
+    }
+    ```
+  </Step>
+
+  <Step title="Handle different error types">
+    ```typescript
+    try {
+      const response = await fetch('/api/data')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      set({ data, loading: false })
+    } catch (error) {
+      if (error instanceof Error) {
+        set({ error: error.message, loading: false })
+      } else {
+        set({ error: 'An unknown error occurred', loading: false })
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Using get() in Async Actions
+
+The `get()` function allows you to read the latest state within async actions:
+
+```typescript
+type Store = {
+  count: number
+  incrementAsync: () => Promise<void>
+}
+
+const useStore = create<Store>()((set, get) => ({
+  count: 0,
+  incrementAsync: async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    
+    // Get the latest count value
+    const currentCount = get().count
+    set({ count: currentCount + 1 })
+  },
+}))
+```
+
+<Tip>
+Always use `get()` to read state in async functions to ensure you're working with the latest values.
+</Tip>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="1. Always handle errors">
+    Wrap async operations in try-catch blocks and store errors in state:
+
+    ```typescript
+    try {
+      // async operation
+    } catch (error) {
+      set({ error: error.message })
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="2. Use loading states">
+    Track loading states to show spinners and disable buttons:
+
+    ```typescript
+    set({ loading: true })
+    // async operation
+    set({ loading: false })
+    ```
+  </Accordion>
+
+  <Accordion title="3. Cancel in-flight requests">
+    Use AbortController to prevent race conditions:
+
+    ```typescript
+    const controller = new AbortController()
+    fetch(url, { signal: controller.signal })
+    ```
+  </Accordion>
+
+  <Accordion title="4. Consider optimistic updates">
+    For better UX, update the UI immediately and sync later:
+
+    ```typescript
+    const prev = get().data
+    set({ data: newData }) // Optimistic
+    try {
+      await sync()
+    } catch {
+      set({ data: prev }) // Revert
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Vanilla Stores" icon="cube" href="/core/vanilla-stores">
+    Use Zustand without React
+  </Card>
+  <Card title="Testing" icon="flask" href="/guides/testing">
+    Learn how to test async actions
+  </Card>
+</CardGroup>

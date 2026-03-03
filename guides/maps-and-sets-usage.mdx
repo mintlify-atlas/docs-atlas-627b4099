@@ -1,0 +1,234 @@
+---
+title: Maps and Sets Usage
+description: Learn how to properly work with Map and Set data structures in Zustand stores
+---
+
+Map and Set are mutable data structures. To use them correctly in Zustand, you must create new instances when updating to ensure proper reactivity.
+
+## Working with Maps
+
+### Reading a Map
+
+Reading from a Map is straightforward:
+
+```typescript
+const foo = useSomeStore((state) => state.foo)
+```
+
+### Updating a Map
+
+<Warning>
+Always create a new Map instance when updating. Mutating the existing Map won't trigger re-renders because the reference doesn't change.
+</Warning>
+
+<Tabs>
+  <Tab title="Single Entry">
+    ```typescript
+    // Update a single entry
+    set((state) => ({
+      foo: new Map(state.foo).set(key, value),
+    }))
+    ```
+  </Tab>
+  <Tab title="Delete Entry">
+    ```typescript
+    // Delete an entry
+    set((state) => {
+      const next = new Map(state.foo)
+      next.delete(key)
+      return { foo: next }
+    })
+    ```
+  </Tab>
+  <Tab title="Multiple Entries">
+    ```typescript
+    // Update multiple entries
+    set((state) => {
+      const next = new Map(state.foo)
+      next.set('key1', 'value1')
+      next.set('key2', 'value2')
+      return { foo: next }
+    })
+    ```
+  </Tab>
+  <Tab title="Clear All">
+    ```typescript
+    // Clear all entries
+    set({ foo: new Map() })
+    ```
+  </Tab>
+</Tabs>
+
+## Working with Sets
+
+### Reading a Set
+
+Reading from a Set is straightforward:
+
+```typescript
+const bar = useSomeStore((state) => state.bar)
+```
+
+### Updating a Set
+
+<Warning>
+Just like Maps, always create a new Set instance when updating.
+</Warning>
+
+<Tabs>
+  <Tab title="Add Item">
+    ```typescript
+    // Add an item
+    set((state) => ({
+      bar: new Set(state.bar).add(item),
+    }))
+    ```
+  </Tab>
+  <Tab title="Delete Item">
+    ```typescript
+    // Delete an item
+    set((state) => {
+      const next = new Set(state.bar)
+      next.delete(item)
+      return { bar: next }
+    })
+    ```
+  </Tab>
+  <Tab title="Toggle Item">
+    ```typescript
+    // Toggle an item (add if not present, delete if present)
+    set((state) => {
+      const next = new Set(state.bar)
+      next.has(item) ? next.delete(item) : next.add(item)
+      return { bar: next }
+    })
+    ```
+  </Tab>
+  <Tab title="Clear All">
+    ```typescript
+    // Clear all items
+    set({ bar: new Set() })
+    ```
+  </Tab>
+</Tabs>
+
+## Why New Instances?
+
+Zustand detects changes by comparing references using `Object.is`. Mutating a Map or Set in place doesn't change its reference:
+
+<CodeGroup>
+```typescript Wrong - No Re-render
+// This won't trigger a re-render
+set((state) => {
+  state.foo.set(key, value)
+  return { foo: state.foo }  // Same reference!
+})
+```
+
+```typescript Correct - Triggers Re-render
+// This will trigger a re-render
+set((state) => ({
+  foo: new Map(state.foo).set(key, value),  // New reference!
+}))
+```
+</CodeGroup>
+
+<Info>
+When you create `new Map(state.foo)`, it creates a shallow copy of the Map with a new reference. This new reference tells Zustand that the state has changed.
+</Info>
+
+## Type Hints for Empty Collections
+
+When initializing empty Maps and Sets, provide type hints to prevent TypeScript from inferring `never[]`:
+
+```typescript
+interface State {
+  ids: Set<string>
+  users: Map<string, User>
+}
+
+const useStore = create<State>()((set) => ({
+  // Without type hints, TypeScript infers never[] - can't add items later
+  // ids: new Set([]),  // Bad!
+  // users: new Map([]), // Bad!
+
+  // With type hints, TypeScript knows the correct types
+  ids: new Set([] as string[]),  // Good!
+  users: new Map([] as [string, User][]),  // Good!
+}))
+```
+
+<Warning>
+Without proper type hints, TypeScript will infer `never[]` which prevents adding items to the collection later.
+</Warning>
+
+## Complete Example
+
+Here's a complete example showing Maps and Sets in action:
+
+```typescript
+import { create } from 'zustand'
+
+interface User {
+  id: string
+  name: string
+}
+
+interface Store {
+  // Map of user IDs to user objects
+  users: Map<string, User>
+  addUser: (user: User) => void
+  removeUser: (id: string) => void
+  updateUser: (id: string, updates: Partial<User>) => void
+
+  // Set of selected user IDs
+  selectedIds: Set<string>
+  toggleSelection: (id: string) => void
+  clearSelection: () => void
+}
+
+const useStore = create<Store>()((set) => ({
+  users: new Map([] as [string, User][]),
+  selectedIds: new Set([] as string[]),
+
+  addUser: (user) =>
+    set((state) => ({
+      users: new Map(state.users).set(user.id, user),
+    })),
+
+  removeUser: (id) =>
+    set((state) => {
+      const users = new Map(state.users)
+      users.delete(id)
+      return { users }
+    }),
+
+  updateUser: (id, updates) =>
+    set((state) => {
+      const user = state.users.get(id)
+      if (!user) return state
+      return {
+        users: new Map(state.users).set(id, { ...user, ...updates }),
+      }
+    }),
+
+  toggleSelection: (id) =>
+    set((state) => {
+      const selectedIds = new Set(state.selectedIds)
+      selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id)
+      return { selectedIds }
+    }),
+
+  clearSelection: () => set({ selectedIds: new Set([] as string[]) }),
+}))
+```
+
+## Live Demo
+
+<Card title="StackBlitz Demo" icon="code" href="https://stackblitz.com/edit/vitejs-vite-5cu5ddvx">
+  See a working example of Maps and Sets in Zustand
+</Card>
+
+<Tip>
+Remember: The key principle is **always create new instances** when updating Maps and Sets. This ensures Zustand can detect changes and trigger re-renders appropriately.
+</Tip>

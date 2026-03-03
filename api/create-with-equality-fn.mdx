@@ -1,0 +1,300 @@
+---
+title: createWithEqualityFn
+description: Create a store with custom equality checking for optimized re-renders
+---
+
+The `createWithEqualityFn` function creates a React Hook-based store with support for custom equality functions. This allows fine-grained control over when components re-render, improving performance.
+
+## Import
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createWithEqualityFn } from 'zustand/traditional'
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    import { createWithEqualityFn } from 'zustand/traditional'
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  You need to install `use-sync-external-store` as a dependency to use `createWithEqualityFn`:
+  
+  ```bash
+  npm install use-sync-external-store
+  ```
+  
+  The `zustand/traditional` package relies on `useSyncExternalStoreWithSelector`.
+</Warning>
+
+## Type Signature
+
+```typescript
+function createWithEqualityFn<T, Mos extends [StoreMutatorIdentifier, unknown][] = []>(
+  initializer: StateCreator<T, [], Mos>,
+  defaultEqualityFn?: <U>(a: U, b: U) => boolean
+): UseBoundStoreWithEqualityFn<Mutate<StoreApi<T>, Mos>>
+
+// Curried version
+function createWithEqualityFn<T>(): <Mos extends [StoreMutatorIdentifier, unknown][] = []>(
+  initializer: StateCreator<T, [], Mos>,
+  defaultEqualityFn?: <U>(a: U, b: U) => boolean
+) => UseBoundStoreWithEqualityFn<Mutate<StoreApi<T>, Mos>>
+```
+
+## Parameters
+
+<ParamField path="initializer" type="StateCreator<T, [], Mos>" required>
+  A function that receives `set`, `get`, and `store` as arguments and returns the initial state object with actions.
+  
+  The function signature is:
+  ```typescript
+  (set: SetState<T>, get: GetState<T>, store: StoreApi<T>) => T
+  ```
+</ParamField>
+
+<ParamField path="defaultEqualityFn" type="(a: U, b: U) => boolean" default="Object.is">
+  An optional equality function used by default when selecting state. Common options:
+  
+  - `Object.is` (default) - Reference equality
+  - `shallow` - Shallow equality for objects and arrays
+  - Custom function - Your own comparison logic
+</ParamField>
+
+## Returns
+
+<ResponseField name="useBoundStore" type="UseBoundStoreWithEqualityFn<StoreApi<T>>">
+  A React Hook with equality function support:
+  
+  ```typescript
+  (): T  // Returns the entire state
+  <U>(
+    selector: (state: T) => U,
+    equalityFn?: (a: U, b: U) => boolean
+  ): U  // Returns a selected slice with optional per-selector equality
+  ```
+  
+  The hook also has API utilities attached: `setState`, `getState`, `getInitialState`, and `subscribe`.
+</ResponseField>
+
+## Basic Usage with Shallow Equality
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    import { createWithEqualityFn } from 'zustand/traditional'
+    import { shallow } from 'zustand/shallow'
+
+    interface BearState {
+      bears: number
+      fish: number
+      increase: () => void
+    }
+
+    const useBearStore = createWithEqualityFn<BearState>()(
+      (set) => ({
+        bears: 0,
+        fish: 0,
+        increase: () => set((state) => ({ bears: state.bears + 1 })),
+      }),
+      shallow  // Use shallow equality by default
+    )
+
+    function BearAndFish() {
+      // This component only re-renders when bears OR fish changes
+      // With shallow equality, object comparison is by value
+      const { bears, fish } = useBearStore(
+        (state) => ({ bears: state.bears, fish: state.fish })
+      )
+      
+      return <div>Bears: {bears}, Fish: {fish}</div>
+    }
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```javascript
+    import { createWithEqualityFn } from 'zustand/traditional'
+    import { shallow } from 'zustand/shallow'
+
+    const useBearStore = createWithEqualityFn(
+      (set) => ({
+        bears: 0,
+        fish: 0,
+        increase: () => set((state) => ({ bears: state.bears + 1 })),
+      }),
+      shallow
+    )
+
+    function BearAndFish() {
+      const { bears, fish } = useBearStore(
+        (state) => ({ bears: state.bears, fish: state.fish })
+      )
+      
+      return <div>Bears: {bears}, Fish: {fish}</div>
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Per-Selector Equality Function
+
+You can override the default equality function for specific selectors:
+
+```typescript
+import { createWithEqualityFn } from 'zustand/traditional'
+import { shallow } from 'zustand/shallow'
+
+const useStore = createWithEqualityFn<State>()(
+  (set) => ({ /* ... */ }),
+  shallow  // Default equality
+)
+
+function Component() {
+  // Use custom equality for this specific selector
+  const data = useStore(
+    (state) => state.complexData,
+    (a, b) => a.id === b.id  // Custom equality
+  )
+  
+  return <div>{data.id}</div>
+}
+```
+
+## Custom Equality Function
+
+Create your own equality function for specialized comparisons:
+
+```typescript
+import { createWithEqualityFn } from 'zustand/traditional'
+
+interface User {
+  id: string
+  name: string
+  email: string
+}
+
+interface UserState {
+  users: User[]
+  addUser: (user: User) => void
+}
+
+// Custom equality: only compare user IDs
+const userIdsEqual = (a: User[], b: User[]) => {
+  if (a.length !== b.length) return false
+  return a.every((user, i) => user.id === b[i].id)
+}
+
+const useUserStore = createWithEqualityFn<UserState>()(
+  (set) => ({
+    users: [],
+    addUser: (user) => set((state) => ({ 
+      users: [...state.users, user] 
+    })),
+  }),
+  userIdsEqual
+)
+```
+
+## Shallow Equality Comparison
+
+The `shallow` function from `zustand/shallow` performs shallow comparison:
+
+```typescript
+import { createWithEqualityFn } from 'zustand/traditional'
+import { shallow } from 'zustand/shallow'
+
+const useStore = createWithEqualityFn<State>()(initializer, shallow)
+
+// These will not cause re-renders if the values haven't changed:
+const obj = useStore((s) => ({ a: s.a, b: s.b }))  // Shallow object comparison
+const arr = useStore((s) => [s.x, s.y])  // Shallow array comparison
+```
+
+<Note>
+  **Shallow equality** compares objects and arrays by their immediate properties/elements. It's useful when you're selecting multiple primitive values into an object or array.
+</Note>
+
+## Without Equality Function
+
+If you don't specify an equality function, `Object.is` is used (reference equality):
+
+```typescript
+import { createWithEqualityFn } from 'zustand/traditional'
+
+const useStore = createWithEqualityFn<State>()((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 })),
+}))
+
+// This uses Object.is (reference equality)
+const count = useStore((state) => state.count)
+```
+
+## Performance Optimization Example
+
+```typescript
+import { createWithEqualityFn } from 'zustand/traditional'
+import { shallow } from 'zustand/shallow'
+
+interface TodoState {
+  todos: Todo[]
+  filter: 'all' | 'active' | 'completed'
+  addTodo: (text: string) => void
+  setFilter: (filter: TodoState['filter']) => void
+}
+
+const useTodoStore = createWithEqualityFn<TodoState>()(
+  (set) => ({
+    todos: [],
+    filter: 'all',
+    addTodo: (text) => set((state) => ({
+      todos: [...state.todos, { id: Date.now(), text, completed: false }]
+    })),
+    setFilter: (filter) => set({ filter }),
+  }),
+  shallow
+)
+
+function TodoList() {
+  // Only re-renders when the filtered list actually changes
+  // Not when other state properties change
+  const { todos, filter } = useTodoStore(
+    (state) => ({
+      todos: state.todos.filter(/* filter logic */),
+      filter: state.filter,
+    })
+  )
+  
+  return <>{/* render todos */}</>
+}
+```
+
+## When to Use
+
+<CardGroup cols={2}>
+  <Card title="Selecting Objects" icon="cube">
+    When your selectors return new objects/arrays on every render
+  </Card>
+  <Card title="Performance Critical" icon="gauge-high">
+    When you need fine-grained control over re-renders
+  </Card>
+  <Card title="Complex Comparisons" icon="code-compare">
+    When you need custom logic to determine if state changed
+  </Card>
+  <Card title="Multiple Values" icon="list">
+    When selecting multiple primitive values into an object
+  </Card>
+</CardGroup>
+
+<Warning>
+  For most use cases, the standard `create` function with proper selector design is sufficient. Only use `createWithEqualityFn` when you have specific performance requirements or need custom equality logic.
+</Warning>
+
+## Related
+
+- [create](/api/create) - Standard store creation without custom equality
+- [shallow](/api/shallow) - Shallow equality comparison utility
+- [useStore](/api/use-store) - Using stores in React components

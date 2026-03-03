@@ -1,0 +1,206 @@
+---
+title: Auto-generating Selectors
+description: Learn how to automatically generate selectors for your Zustand stores to reduce boilerplate code
+---
+
+When using Zustand, it's recommended to use selectors when accessing properties or actions from the store:
+
+```typescript
+const bears = useBearStore((state) => state.bears)
+```
+
+However, writing these selectors repeatedly can become tedious. You can auto-generate selectors to streamline your code.
+
+## Implementation
+
+<Steps>
+  <Step title="Create the createSelectors function">
+    This helper function adds auto-generated selectors to your store:
+
+    ```typescript
+    import { StoreApi, UseBoundStore } from 'zustand'
+
+    type WithSelectors<S> = S extends { getState: () => infer T }
+      ? S & { use: { [K in keyof T]: () => T[K] } }
+      : never
+
+    const createSelectors = <S extends UseBoundStore<StoreApi<object>>>(
+      _store: S,
+    ) => {
+      const store = _store as WithSelectors<typeof _store>
+      store.use = {}
+      for (const k of Object.keys(store.getState())) {
+        ;(store.use as any)[k] = () => store((s) => s[k as keyof typeof s])
+      }
+
+      return store
+    }
+    ```
+  </Step>
+
+  <Step title="Create your base store">
+    Define your store as usual:
+
+    ```typescript
+    interface BearState {
+      bears: number
+      increase: (by: number) => void
+      increment: () => void
+    }
+
+    const useBearStoreBase = create<BearState>()((set) => ({
+      bears: 0,
+      increase: (by) => set((state) => ({ bears: state.bears + by })),
+      increment: () => set((state) => ({ bears: state.bears + 1 })),
+    }))
+    ```
+  </Step>
+
+  <Step title="Apply createSelectors to your store">
+    Wrap your store with the helper function:
+
+    ```typescript
+    const useBearStore = createSelectors(useBearStoreBase)
+    ```
+  </Step>
+
+  <Step title="Use auto-generated selectors">
+    Access properties and actions directly:
+
+    ```typescript
+    // Get the property
+    const bears = useBearStore.use.bears()
+
+    // Get the action
+    const increment = useBearStore.use.increment()
+    ```
+  </Step>
+</Steps>
+
+## Comparison
+
+<CodeGroup>
+```typescript Manual Selectors
+import { create } from 'zustand'
+
+const useBearStore = create<BearState>()((set) => ({
+  bears: 0,
+  increase: (by) => set((state) => ({ bears: state.bears + by })),
+  increment: () => set((state) => ({ bears: state.bears + 1 })),
+}))
+
+function MyComponent() {
+  const bears = useBearStore((state) => state.bears)
+  const increment = useBearStore((state) => state.increment)
+  // ... repetitive selector code
+}
+```
+
+```typescript Auto-generated Selectors
+import { create } from 'zustand'
+
+const useBearStoreBase = create<BearState>()((set) => ({
+  bears: 0,
+  increase: (by) => set((state) => ({ bears: state.bears + by })),
+  increment: () => set((state) => ({ bears: state.bears + 1 })),
+}))
+
+const useBearStore = createSelectors(useBearStoreBase)
+
+function MyComponent() {
+  const bears = useBearStore.use.bears()
+  const increment = useBearStore.use.increment()
+  // ... cleaner, more concise code
+}
+```
+</CodeGroup>
+
+## Vanilla Store Version
+
+If you're using a vanilla store (created with `createStore`), use this version of `createSelectors`:
+
+```typescript
+import { StoreApi, useStore } from 'zustand'
+
+type WithSelectors<S> = S extends { getState: () => infer T }
+  ? S & { use: { [K in keyof T]: () => T[K] } }
+  : never
+
+const createSelectors = <S extends StoreApi<object>>(_store: S) => {
+  const store = _store as WithSelectors<typeof _store>
+  store.use = {}
+  for (const k of Object.keys(store.getState())) {
+    ;(store.use as any)[k] = () =>
+      useStore(_store, (s) => s[k as keyof typeof s])
+  }
+
+  return store
+}
+```
+
+### Usage with Vanilla Stores
+
+<Steps>
+  <Step title="Create the vanilla store">
+    ```typescript
+    import { createStore } from 'zustand'
+
+    interface BearState {
+      bears: number
+      increase: (by: number) => void
+      increment: () => void
+    }
+
+    const store = createStore<BearState>()((set) => ({
+      bears: 0,
+      increase: (by) => set((state) => ({ bears: state.bears + by })),
+      increment: () => set((state) => ({ bears: state.bears + 1 })),
+    }))
+    ```
+  </Step>
+
+  <Step title="Apply createSelectors">
+    ```typescript
+    const useBearStore = createSelectors(store)
+    ```
+  </Step>
+
+  <Step title="Use in components">
+    ```typescript
+    // Get the property
+    const bears = useBearStore.use.bears()
+
+    // Get the action
+    const increment = useBearStore.use.increment()
+    ```
+  </Step>
+</Steps>
+
+## Live Example
+
+<Card title="Code Sandbox Demo" icon="code" href="https://codesandbox.io/s/zustand-auto-generate-selectors-forked-rl8v5e?file=/src/selectors.ts">
+  See a working example of auto-generated selectors in action
+</Card>
+
+## Third-party Libraries
+
+Several libraries provide similar functionality with additional features:
+
+<CardGroup cols={2}>
+  <Card title="auto-zustand-selectors-hook" icon="github" href="https://github.com/Albert-Gao/auto-zustand-selectors-hook">
+    Automatically generate hooks for Zustand selectors
+  </Card>
+  <Card title="react-hooks-global-state" icon="github" href="https://github.com/dai-shi/react-hooks-global-state">
+    Simple global state management with React Hooks
+  </Card>
+  <Card title="zustood" icon="github" href="https://github.com/udecode/zustood">
+    Modular store factory with auto-generated selectors
+  </Card>
+  <Card title="@davstack/store" icon="github" href="https://github.com/DawidWraga/davstack">
+    Type-safe store with built-in selectors
+  </Card>
+</CardGroup>
+
+<Tip>
+Auto-generated selectors are particularly useful in large applications where you frequently access multiple store properties across many components.
+</Tip>
